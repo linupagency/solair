@@ -39,3 +39,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+.env.local
+certs/
+*.p12
+*.pfx
+*.key
+*.crt
