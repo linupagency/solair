@@ -1,0 +1,543 @@
+{
+  "ok": true,
+  "probeSpecVersion": "1",
+  "mode": "A",
+  "scenarioId": "S1-trailer-VR-raw-tipoVR",
+  "label": "ALG-PTM 20260413 2130 VR raw avec tipoVehiculo VR",
+  "inputEcho": {
+    "probeSpecVersion": "1",
+    "mode": "A",
+    "scenarioId": "S1-trailer-VR-raw-tipoVR",
+    "label": "ALG-PTM 20260413 2130 VR raw avec tipoVehiculo VR",
+    "body": {
+      "origen": "ALG",
+      "destino": "PTM",
+      "fechaSalida": "20260413",
+      "horaSalida": "2130",
+      "cantidad": 1,
+      "codigoServicioVenta": "BY",
+      "tipoServicioVenta": "P",
+      "tipoPasajero": "A",
+      "passengerTipos": [
+        "A"
+      ],
+      "bonificacion": "G",
+      "sentidoSalida": 1,
+      "animalsCount": 0,
+      "vehicle": "car",
+      "vehicleCategory": "medium_tourism_car_trailer",
+      "vehicleData": {
+        "marque": "LAB",
+        "modele": "VR-TEST",
+        "immatriculation": "VRTYPE001",
+        "alto": 1.92,
+        "ancho": 1.85,
+        "largo": 8,
+        "tipoVehiculo": "VR"
+      },
+      "companionServicioVenta": {
+        "codigoServicioVenta": "VR",
+        "tipoServicioVenta": "V",
+        "cantidad": 1
+      },
+      "rawTrailerLength": true,
+      "pricingSoapTrace": true
+    }
+  },
+  "soapArgs": {
+    "contextoEntidad": {
+      "codigoAgencia": "41761",
+      "codigoIdioma": "FR",
+      "codigoUsuario": "MEL0951S.L",
+      "versionXml": "0.0.0.1"
+    },
+    "salidasEntidad": {
+      "salidaEntidad": {
+        "fechaSalida": "20260413",
+        "horaSalida": "2130",
+        "sentidoSalida": 1,
+        "serviciosVentasEntidad": {
+          "servicioVentaEntidad": [
+            {
+              "cantidad": 1,
+              "codigoServicioVenta": "BY",
+              "tipoServicioVenta": "P"
+            },
+            {
+              "cantidad": 1,
+              "codigoServicioVenta": "VR",
+              "tipoServicioVenta": "V"
+            }
+          ]
+        },
+        "trayectoEntidad": {
+          "puertoDestinoEntidad": {
+            "codigoPuerto": "PTM"
+          },
+          "puertoOrigenEntidad": {
+            "codigoPuerto": "ALG"
+          }
+        }
+      }
+    },
+    "paxsVehsEntidad": {
+      "paxVehEntidad": {
+        "pasajeroEntidad": {
+          "tipoPasajeroEntidad": {
+            "tipoPasajero": "A"
+          }
+        },
+        "vehiculoEntidad": {
+          "tipoVehiculo": "VR",
+          "marca": "LAB VR-TEST",
+          "matricula": "VRTYPE001",
+          "alto": 1.92,
+          "ancho": 1.85,
+          "largo": 8
+        }
+      }
+    },
+    "bonificacionEntidad": {
+      "codigoBonificacion": "G"
+    }
+  },
+  "armasReturn": {
+    "codigo": "000000",
+    "texto": "RENSEIGNEMENTS SUR LES BONUS RÉSIDENTS. La réduction résident sera indiquée et appliquée à la dernière étape du processus d'achat, avec les données de chaque passager."
+  },
+  "rawResult": {
+    "return": {
+      "attributes": {
+        "xsi:type": "ax227:Ventas_NasaRespuestaTarificaciones"
+      },
+      "codigo": "000000",
+      "firma": "08b176a6a755e12ed51e352a7a398b49",
+      "texto": "RENSEIGNEMENTS SUR LES BONUS RÉSIDENTS. La réduction résident sera indiquée et appliquée à la dernière étape du processus d'achat, avec les données de chaque passager.",
+      "ttl": 3600,
+      "versionXml": "0.0.0.1",
+      "tarificacionesEntidad": {
+        "attributes": {
+          "xsi:type": "ax220:TarificacionesEntidad"
+        },
+        "tarificacionEntidad": [
+          {
+            "attributes": {
+              "xsi:type": "ax220:TarificacionEntidad"
+            },
+            "bonificacionEntidad": {
+              "attributes": {
+                "xsi:type": "ax220:BonificacionEntidad"
+              },
+              "codigoBonificacion": "G",
+              "textoCorto": "Générale"
+            },
+            "precioEntidad": {
+              "attributes": {
+                "xsi:type": "ax220:PrecioEntidad"
+              },
+              "devolucion": 0,
+              "gastos": 0,
+              "total": 281
+            },
+            "precioIdaEntidad": {
+              "attributes": {
+                "xsi:type": "ax220:PrecioEntidad"
+              },
+              "devolucion": 0,
+              "gastos": 0,
+              "precioDetalleEntidad": {
+                "attributes": {
+                  "xsi:type": "ax220:PrecioDetalleEntidad"
+                },
+                "codigo": "residente",
+                "valor": "0.00"
+              },
+              "total": 281
+            },
+            "tarifaEntidad": {
+              "attributes": {
+                "xsi:type": "ax220:TarifaEntidad"
+              },
+              "codigoTarifa": "G",
+              "textoCorto": "GÉNÉRALE",
+              "textoLargo": ""
+            }
+          }
+        ]
+      }
+    }
+  },
+  "normalizedLines": [
+    {
+      "index": 0,
+      "tarifaTextoCorto": "GÉNÉRALE",
+      "precioTotal": 281,
+      "bonificacionCodigo": "G",
+      "raw": {
+        "attributes": {
+          "xsi:type": "ax220:TarificacionEntidad"
+        },
+        "bonificacionEntidad": {
+          "attributes": {
+            "xsi:type": "ax220:BonificacionEntidad"
+          },
+          "codigoBonificacion": "G",
+          "textoCorto": "Générale"
+        },
+        "precioEntidad": {
+          "attributes": {
+            "xsi:type": "ax220:PrecioEntidad"
+          },
+          "devolucion": 0,
+          "gastos": 0,
+          "total": 281
+        },
+        "precioIdaEntidad": {
+          "attributes": {
+            "xsi:type": "ax220:PrecioEntidad"
+          },
+          "devolucion": 0,
+          "gastos": 0,
+          "precioDetalleEntidad": {
+            "attributes": {
+              "xsi:type": "ax220:PrecioDetalleEntidad"
+            },
+            "codigo": "residente",
+            "valor": "0.00"
+          },
+          "total": 281
+        },
+        "tarifaEntidad": {
+          "attributes": {
+            "xsi:type": "ax220:TarifaEntidad"
+          },
+          "codigoTarifa": "G",
+          "textoCorto": "GÉNÉRALE",
+          "textoLargo": ""
+        }
+      }
+    }
+  ],
+  "total": 281,
+  "verdict": {
+    "status": "OK",
+    "code": "SUCCESS",
+    "message": "Réponse Armas analysée ; total extrait."
+  },
+  "transportAccepted": true,
+  "pricingUsable": true,
+  "pricingSoapTraceEcho": {
+    "postBody": {
+      "origen": "ALG",
+      "destino": "PTM",
+      "fechaSalida": "20260413",
+      "horaSalida": "2130",
+      "cantidad": 1,
+      "codigoServicioVenta": "BY",
+      "tipoServicioVenta": "P",
+      "tipoPasajero": "A",
+      "passengerTipos": [
+        "A"
+      ],
+      "bonificacion": "G",
+      "sentidoSalida": 1,
+      "animalsCount": 0,
+      "vehicle": "car",
+      "vehicleCategory": "medium_tourism_car_trailer",
+      "vehicleData": {
+        "marque": "LAB",
+        "modele": "VR-TEST",
+        "immatriculation": "VRTYPE001",
+        "alto": 1.92,
+        "ancho": 1.85,
+        "largo": 8,
+        "tipoVehiculo": "VR"
+      },
+      "companionServicioVenta": {
+        "codigoServicioVenta": "VR",
+        "tipoServicioVenta": "V",
+        "cantidad": 1
+      },
+      "rawTrailerLength": true,
+      "pricingSoapTrace": true
+    },
+    "nasaParams": {
+      "origen": "ALG",
+      "destino": "PTM",
+      "fechaSalida": "20260413",
+      "horaSalida": "2130",
+      "cantidad": 1,
+      "codigoServicioVenta": "BY",
+      "tipoServicioVenta": "P",
+      "tipoPasajero": "A",
+      "passengerTipos": [
+        "A"
+      ],
+      "animalsCount": 0,
+      "bonificacion": "G",
+      "sentidoSalida": 1,
+      "vehicle": "car",
+      "vehicleCategory": "medium_tourism_car_trailer",
+      "vehicleData": {
+        "marque": "LAB",
+        "modele": "VR-TEST",
+        "immatriculation": "VRTYPE001",
+        "alto": 1.92,
+        "ancho": 1.85,
+        "largo": 8,
+        "tipoVehiculo": "VR",
+        "seguro": ""
+      },
+      "companionServicioVenta": {
+        "codigoServicioVenta": "VR",
+        "tipoServicioVenta": "V",
+        "cantidad": 1
+      },
+      "rawTrailerLength": true,
+      "pricingSoapTrace": true
+    },
+    "soapArgs": {
+      "contextoEntidad": {
+        "codigoAgencia": "41761",
+        "codigoIdioma": "FR",
+        "codigoUsuario": "MEL0951S.L",
+        "versionXml": "0.0.0.1"
+      },
+      "salidasEntidad": {
+        "salidaEntidad": {
+          "fechaSalida": "20260413",
+          "horaSalida": "2130",
+          "sentidoSalida": 1,
+          "serviciosVentasEntidad": {
+            "servicioVentaEntidad": [
+              {
+                "cantidad": 1,
+                "codigoServicioVenta": "BY",
+                "tipoServicioVenta": "P"
+              },
+              {
+                "cantidad": 1,
+                "codigoServicioVenta": "VR",
+                "tipoServicioVenta": "V"
+              }
+            ]
+          },
+          "trayectoEntidad": {
+            "puertoDestinoEntidad": {
+              "codigoPuerto": "PTM"
+            },
+            "puertoOrigenEntidad": {
+              "codigoPuerto": "ALG"
+            }
+          }
+        }
+      },
+      "paxsVehsEntidad": {
+        "paxVehEntidad": {
+          "pasajeroEntidad": {
+            "tipoPasajeroEntidad": {
+              "tipoPasajero": "A"
+            }
+          },
+          "vehiculoEntidad": {
+            "tipoVehiculo": "VR",
+            "marca": "LAB VR-TEST",
+            "matricula": "VRTYPE001",
+            "alto": 1.92,
+            "ancho": 1.85,
+            "largo": 8
+          }
+        }
+      },
+      "bonificacionEntidad": {
+        "codigoBonificacion": "G"
+      }
+    },
+    "rawResult": {
+      "return": {
+        "attributes": {
+          "xsi:type": "ax227:Ventas_NasaRespuestaTarificaciones"
+        },
+        "codigo": "000000",
+        "firma": "08b176a6a755e12ed51e352a7a398b49",
+        "texto": "RENSEIGNEMENTS SUR LES BONUS RÉSIDENTS. La réduction résident sera indiquée et appliquée à la dernière étape du processus d'achat, avec les données de chaque passager.",
+        "ttl": 3600,
+        "versionXml": "0.0.0.1",
+        "tarificacionesEntidad": {
+          "attributes": {
+            "xsi:type": "ax220:TarificacionesEntidad"
+          },
+          "tarificacionEntidad": [
+            {
+              "attributes": {
+                "xsi:type": "ax220:TarificacionEntidad"
+              },
+              "bonificacionEntidad": {
+                "attributes": {
+                  "xsi:type": "ax220:BonificacionEntidad"
+                },
+                "codigoBonificacion": "G",
+                "textoCorto": "Générale"
+              },
+              "precioEntidad": {
+                "attributes": {
+                  "xsi:type": "ax220:PrecioEntidad"
+                },
+                "devolucion": 0,
+                "gastos": 0,
+                "total": 281
+              },
+              "precioIdaEntidad": {
+                "attributes": {
+                  "xsi:type": "ax220:PrecioEntidad"
+                },
+                "devolucion": 0,
+                "gastos": 0,
+                "precioDetalleEntidad": {
+                  "attributes": {
+                    "xsi:type": "ax220:PrecioDetalleEntidad"
+                  },
+                  "codigo": "residente",
+                  "valor": "0.00"
+                },
+                "total": 281
+              },
+              "tarifaEntidad": {
+                "attributes": {
+                  "xsi:type": "ax220:TarifaEntidad"
+                },
+                "codigoTarifa": "G",
+                "textoCorto": "GÉNÉRALE",
+                "textoLargo": ""
+              }
+            }
+          ]
+        }
+      }
+    },
+    "returnNodeComparison": {
+      "dataReturn": {
+        "attributes": {
+          "xsi:type": "ax227:Ventas_NasaRespuestaTarificaciones"
+        },
+        "codigo": "000000",
+        "firma": "08b176a6a755e12ed51e352a7a398b49",
+        "texto": "RENSEIGNEMENTS SUR LES BONUS RÉSIDENTS. La réduction résident sera indiquée et appliquée à la dernière étape du processus d'achat, avec les données de chaque passager.",
+        "ttl": 3600,
+        "versionXml": "0.0.0.1",
+        "tarificacionesEntidad": {
+          "attributes": {
+            "xsi:type": "ax220:TarificacionesEntidad"
+          },
+          "tarificacionEntidad": [
+            {
+              "attributes": {
+                "xsi:type": "ax220:TarificacionEntidad"
+              },
+              "bonificacionEntidad": {
+                "attributes": {
+                  "xsi:type": "ax220:BonificacionEntidad"
+                },
+                "codigoBonificacion": "G",
+                "textoCorto": "Générale"
+              },
+              "precioEntidad": {
+                "attributes": {
+                  "xsi:type": "ax220:PrecioEntidad"
+                },
+                "devolucion": 0,
+                "gastos": 0,
+                "total": 281
+              },
+              "precioIdaEntidad": {
+                "attributes": {
+                  "xsi:type": "ax220:PrecioEntidad"
+                },
+                "devolucion": 0,
+                "gastos": 0,
+                "precioDetalleEntidad": {
+                  "attributes": {
+                    "xsi:type": "ax220:PrecioDetalleEntidad"
+                  },
+                  "codigo": "residente",
+                  "valor": "0.00"
+                },
+                "total": 281
+              },
+              "tarifaEntidad": {
+                "attributes": {
+                  "xsi:type": "ax220:TarifaEntidad"
+                },
+                "codigoTarifa": "G",
+                "textoCorto": "GÉNÉRALE",
+                "textoLargo": ""
+              }
+            }
+          ]
+        }
+      },
+      "getNasaTarificacionesReturnNode": {
+        "attributes": {
+          "xsi:type": "ax227:Ventas_NasaRespuestaTarificaciones"
+        },
+        "codigo": "000000",
+        "firma": "08b176a6a755e12ed51e352a7a398b49",
+        "texto": "RENSEIGNEMENTS SUR LES BONUS RÉSIDENTS. La réduction résident sera indiquée et appliquée à la dernière étape du processus d'achat, avec les données de chaque passager.",
+        "ttl": 3600,
+        "versionXml": "0.0.0.1",
+        "tarificacionesEntidad": {
+          "attributes": {
+            "xsi:type": "ax220:TarificacionesEntidad"
+          },
+          "tarificacionEntidad": [
+            {
+              "attributes": {
+                "xsi:type": "ax220:TarificacionEntidad"
+              },
+              "bonificacionEntidad": {
+                "attributes": {
+                  "xsi:type": "ax220:BonificacionEntidad"
+                },
+                "codigoBonificacion": "G",
+                "textoCorto": "Générale"
+              },
+              "precioEntidad": {
+                "attributes": {
+                  "xsi:type": "ax220:PrecioEntidad"
+                },
+                "devolucion": 0,
+                "gastos": 0,
+                "total": 281
+              },
+              "precioIdaEntidad": {
+                "attributes": {
+                  "xsi:type": "ax220:PrecioEntidad"
+                },
+                "devolucion": 0,
+                "gastos": 0,
+                "precioDetalleEntidad": {
+                  "attributes": {
+                    "xsi:type": "ax220:PrecioDetalleEntidad"
+                  },
+                  "codigo": "residente",
+                  "valor": "0.00"
+                },
+                "total": 281
+              },
+              "tarifaEntidad": {
+                "attributes": {
+                  "xsi:type": "ax220:TarifaEntidad"
+                },
+                "codigoTarifa": "G",
+                "textoCorto": "GÉNÉRALE",
+                "textoLargo": ""
+              }
+            }
+          ]
+        }
+      },
+      "sameObjectReference": true,
+      "jsonStringEqual": true
+    }
+  }
+}

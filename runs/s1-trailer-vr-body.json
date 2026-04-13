@@ -1,0 +1,32 @@
+{
+  "origen": "ALG",
+  "destino": "PTM",
+  "fechaSalida": "20260413",
+  "horaSalida": "2130",
+  "cantidad": 1,
+  "codigoServicioVenta": "BY",
+  "tipoServicioVenta": "P",
+  "tipoPasajero": "A",
+  "passengerTipos": ["A"],
+  "bonificacion": "G",
+  "sentidoSalida": 1,
+  "animalsCount": 0,
+  "vehicle": "car",
+  "vehicleCategory": "medium_tourism_car_trailer",
+  "vehicleData": {
+    "marque": "LAB",
+    "modele": "VR-TEST",
+    "immatriculation": "VR001TEST",
+    "alto": 1.92,
+    "ancho": 1.85,
+    "largo": 9.2,
+    "tipoVehiculo": "V"
+  },
+  "companionServicioVenta": {
+    "codigoServicioVenta": "VR",
+    "tipoServicioVenta": "V",
+    "cantidad": 1
+  },
+  "rawTrailerLength": false,
+  "pricingSoapTrace": true
+}

@@ -1,0 +1,34 @@
+---
+description: Sources obligatoires Armas (WSDL Ventas20171009, API réelle, interdictions fallback/mapping inventé)
+alwaysApply: true
+---
+
+# Armas — sources et priorités (obligatoire)
+
+Avant toute modification touchant SOAP, `nasaTarificaciones`, véhicule, ou pricing transport :
+
+## Ordre des sources techniques et métier
+
+1. **WSDL** : `Ventas20171009.wsdl` (racine du dépôt ou `wsdl/Ventas20171009.wsdl`) — structure des requêtes SOAP, entités, champs véhicule (`VehEntidad`, etc.), construction attendue des appels de tarification.
+2. **Instructions et preuves métier Armas** (fournies par l’utilisateur / projet) — codes réellement utilisés, catégories véhicule documentées : `V|V`, `Y|V`, `X|V`, `VR|V`, `YR|V`, `XR|V`, `AC|V`, `MT|V`, `BI|V`, dimensions observées, comportement du site officiel.
+3. **Captures / relevés réseau** du vrai site Armas — priment sur toute heuristique de libellé ou interprétation locale.
+
+## Ordre de résolution des conflits
+
+1. Réponses réelles de l’API Armas  
+2. WSDL Armas du dépôt  
+3. Captures réseau du site Armas  
+4. **Ensuite seulement** le code local existant  
+
+Si le code local ou une hypothèse contredit les éléments Armas ci-dessus, **c’est Armas qui prime**.
+
+## Interdictions
+
+- Ne pas inventer de mapping métier ni de codes sans preuve (WSDL + preuves / réseau / réponses API).
+- Ne pas déduire la vérité métier uniquement depuis `textoLargo` ou autres champs « libellé » fragiles.
+- Pas de **fallback silencieux** vers `small_tourism_car` (ou toute catégorie par défaut non prouvée) : erreur explicite ou chemin documenté.
+- Ne pas ignorer des preuves utilisateur déjà fournies au profit d’une hypothèse de code.
+
+## Implémentation dans ce dépôt
+
+- Source de vérité catalogue véhicule / dimensions : préférer `src/lib/vehicle/armas-catalog.ts` et la chaîne `normalize` → builders pricing, en cohérence avec le WSDL et les preuves, pas des duplications contradictoires.

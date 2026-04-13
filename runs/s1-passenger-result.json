@@ -1,0 +1,22 @@
+{
+  "ok": false,
+  "probeSpecVersion": "1",
+  "inputEcho": {
+    "probeSpecVersion": "1"
+  },
+  "soapArgs": null,
+  "armasReturn": {
+    "codigo": null,
+    "texto": null
+  },
+  "rawResult": null,
+  "normalizedLines": [],
+  "total": null,
+  "verdict": {
+    "status": "INVALID_INPUT",
+    "code": "LAB_DISABLED",
+    "message": "Probe désactivé : définir SOLAIR_ARMAS_PRICING_PROBE=1 dans l’environnement."
+  },
+  "transportAccepted": false,
+  "pricingUsable": false
+}

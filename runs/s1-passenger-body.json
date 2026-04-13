@@ -1,0 +1,16 @@
+{
+  "origen": "ALG",
+  "destino": "PTM",
+  "fechaSalida": "20260413",
+  "horaSalida": "2130",
+  "cantidad": 1,
+  "codigoServicioVenta": "BY",
+  "tipoServicioVenta": "P",
+  "tipoPasajero": "A",
+  "passengerTipos": ["A"],
+  "bonificacion": "G",
+  "sentidoSalida": 1,
+  "animalsCount": 0,
+  "vehicle": "none",
+  "pricingSoapTrace": true
+}

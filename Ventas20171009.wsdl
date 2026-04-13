@@ -1,0 +1,1429 @@
+<?xml version="1.0" encoding="UTF-8"?><wsdl:definitions xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/" xmlns:ns1="http://org.apache.axis2/xsd" xmlns:ns="http://sv.navieraarmas.com" xmlns:ax240="http://entidades.navieraarmas.com/xsd" xmlns:wsaw="http://www.w3.org/2006/05/addressing/wsdl" xmlns:http="http://schemas.xmlsoap.org/wsdl/http/" xmlns:ax239="http://ventas.entidades.navieraarmas.com/xsd" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:mime="http://schemas.xmlsoap.org/wsdl/mime/" xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/" xmlns:soap12="http://schemas.xmlsoap.org/wsdl/soap12/" xmlns:ax243="http://sv.navieraarmas.com/xsd" targetNamespace="http://sv.navieraarmas.com">
+    <wsdl:documentation>
+		NASA Ventas v1_0		
+	</wsdl:documentation>
+    <wsdl:types>
+        <xs:schema xmlns:ax245="http://ventas.entidades.navieraarmas.com/xsd" xmlns:ax244="http://entidades.navieraarmas.com/xsd" attributeFormDefault="qualified" elementFormDefault="unqualified" targetNamespace="http://sv.navieraarmas.com/xsd">
+            <xs:import namespace="http://entidades.navieraarmas.com/xsd"/>
+            <xs:import namespace="http://ventas.entidades.navieraarmas.com/xsd"/>
+            <xs:complexType name="Ventas_NasaRespuestaTiposPasajeros">
+                <xs:complexContent>
+                    <xs:extension base="ax240:NasaRespuesta">
+                        <xs:sequence>
+                            <xs:element minOccurs="0" name="tiposPasajerosEntidad" nillable="true" type="ax239:TiposPasajerosEntidad"/>
+                        </xs:sequence>
+                    </xs:extension>
+                </xs:complexContent>
+            </xs:complexType>
+            <xs:complexType name="Ventas_NasaRespuestaTarificaciones">
+                <xs:complexContent>
+                    <xs:extension base="ax240:NasaRespuesta">
+                        <xs:sequence>
+                            <xs:element minOccurs="0" name="tarificacionesEntidad" nillable="true" type="ax239:TarificacionesEntidad"/>
+                        </xs:sequence>
+                    </xs:extension>
+                </xs:complexContent>
+            </xs:complexType>
+            <xs:complexType name="Ventas_NasaRespuestaReservas">
+                <xs:complexContent>
+                    <xs:extension base="ax240:NasaRespuesta">
+                        <xs:sequence>
+                            <xs:element minOccurs="0" name="reservasEntidad" nillable="true" type="ax239:ReservasEntidad"/>
+                        </xs:sequence>
+                    </xs:extension>
+                </xs:complexContent>
+            </xs:complexType>
+            <xs:complexType name="Ventas_NasaRespuestaPagos">
+                <xs:complexContent>
+                    <xs:extension base="ax240:NasaRespuesta">
+                        <xs:sequence>
+                            <xs:element minOccurs="0" name="pagosEntidad" nillable="true" type="ax239:PagosEntidad"/>
+                        </xs:sequence>
+                    </xs:extension>
+                </xs:complexContent>
+            </xs:complexType>
+            <xs:complexType name="Ventas_NasaRespuestaDevoluciones">
+                <xs:complexContent>
+                    <xs:extension base="ax240:NasaRespuesta">
+                        <xs:sequence>
+                            <xs:element minOccurs="0" name="pagosEntidad" nillable="true" type="ax239:PagosEntidad"/>
+                        </xs:sequence>
+                    </xs:extension>
+                </xs:complexContent>
+            </xs:complexType>
+            <xs:complexType name="Ventas_NasaRespuestaRecuperaVenta">
+                <xs:complexContent>
+                    <xs:extension base="ax240:NasaRespuesta">
+                        <xs:sequence>
+                            <xs:element minOccurs="0" name="accvEntidad" nillable="true" type="ax239:AccvEntidad"/>
+                        </xs:sequence>
+                    </xs:extension>
+                </xs:complexContent>
+            </xs:complexType>
+            <xs:complexType name="Ventas_NasaRespuestaRecuperaVentas">
+                <xs:complexContent>
+                    <xs:extension base="ax240:NasaRespuesta">
+                        <xs:sequence>
+                            <xs:element maxOccurs="unbounded" minOccurs="0" name="accventasEntidad" nillable="true" type="ax239:AccvEntidad"/>
+                        </xs:sequence>
+                    </xs:extension>
+                </xs:complexContent>
+            </xs:complexType>
+            <xs:complexType name="Ventas_NasaRespuestaSalidasCalendario">
+                <xs:complexContent>
+                    <xs:extension base="ax240:NasaRespuesta">
+                        <xs:sequence>
+                            <xs:element minOccurs="0" name="salidasCalendarioEntidad" nillable="true" type="ax239:SalidasCalendarioEntidad"/>
+                        </xs:sequence>
+                    </xs:extension>
+                </xs:complexContent>
+            </xs:complexType>
+            <xs:complexType name="Ventas_NasaRespuestaProvincias">
+                <xs:complexContent>
+                    <xs:extension base="ax240:NasaRespuesta">
+                        <xs:sequence>
+                            <xs:element minOccurs="0" name="provinciasEntidad" nillable="true" type="ax239:ProvinciasEntidad"/>
+                        </xs:sequence>
+                    </xs:extension>
+                </xs:complexContent>
+            </xs:complexType>
+            <xs:complexType name="Ventas_NasaRespuestaSalidasDetalle">
+                <xs:complexContent>
+                    <xs:extension base="ax240:NasaRespuesta">
+                        <xs:sequence>
+                            <xs:element minOccurs="0" name="salidasEntidad" nillable="true" type="ax239:SalidasEntidad"/>
+                        </xs:sequence>
+                    </xs:extension>
+                </xs:complexContent>
+            </xs:complexType>
+            <xs:complexType name="Ventas_NasaRespuestaPaises">
+                <xs:complexContent>
+                    <xs:extension base="ax240:NasaRespuesta">
+                        <xs:sequence>
+                            <xs:element minOccurs="0" name="paisesEntidad" nillable="true" type="ax239:PaisesEntidad"/>
+                        </xs:sequence>
+                    </xs:extension>
+                </xs:complexContent>
+            </xs:complexType>
+            <xs:complexType name="Ventas_NasaRespuestaTiposDocumentos">
+                <xs:complexContent>
+                    <xs:extension base="ax240:NasaRespuesta">
+                        <xs:sequence>
+                            <xs:element minOccurs="0" name="tiposDocumentosEntidad" nillable="true" type="ax239:TiposDocumentosEntidad"/>
+                        </xs:sequence>
+                    </xs:extension>
+                </xs:complexContent>
+            </xs:complexType>
+            <xs:complexType name="Ventas_NasaRespuestaTarifas">
+                <xs:complexContent>
+                    <xs:extension base="ax240:NasaRespuesta">
+                        <xs:sequence>
+                            <xs:element minOccurs="0" name="tarifasEntidad" nillable="true" type="ax239:TarifasEntidad"/>
+                        </xs:sequence>
+                    </xs:extension>
+                </xs:complexContent>
+            </xs:complexType>
+            <xs:complexType name="Ventas_NasaRespuestaSalidas">
+                <xs:complexContent>
+                    <xs:extension base="ax240:NasaRespuesta">
+                        <xs:sequence>
+                            <xs:element minOccurs="0" name="salidasEntidad" nillable="true" type="ax239:SalidasEntidad"/>
+                        </xs:sequence>
+                    </xs:extension>
+                </xs:complexContent>
+            </xs:complexType>
+            <xs:complexType name="Ventas_NasaRespuestaTrayectos">
+                <xs:complexContent>
+                    <xs:extension base="ax240:NasaRespuesta">
+                        <xs:sequence>
+                            <xs:element minOccurs="0" name="trayectosEntidad" nillable="true" type="ax239:TrayectosEntidad"/>
+                        </xs:sequence>
+                    </xs:extension>
+                </xs:complexContent>
+            </xs:complexType>
+            <xs:complexType name="Ventas_NasaRespuestaBonificaciones">
+                <xs:complexContent>
+                    <xs:extension base="ax240:NasaRespuesta">
+                        <xs:sequence>
+                            <xs:element minOccurs="0" name="bonificacionesEntidad" nillable="true" type="ax239:BonificacionesEntidad"/>
+                        </xs:sequence>
+                    </xs:extension>
+                </xs:complexContent>
+            </xs:complexType>
+            <xs:complexType name="Ventas_NasaRespuestaLocalidades">
+                <xs:complexContent>
+                    <xs:extension base="ax240:NasaRespuesta">
+                        <xs:sequence>
+                            <xs:element minOccurs="0" name="localidadesEntidad" nillable="true" type="ax239:LocalidadesEntidad"/>
+                        </xs:sequence>
+                    </xs:extension>
+                </xs:complexContent>
+            </xs:complexType>
+            <xs:complexType name="Ventas_NasaRespuestaServiciosVentas">
+                <xs:complexContent>
+                    <xs:extension base="ax240:NasaRespuesta">
+                        <xs:sequence>
+                            <xs:element minOccurs="0" name="serviciosVentasEntidad" nillable="true" type="ax239:ServiciosVentasEntidad"/>
+                        </xs:sequence>
+                    </xs:extension>
+                </xs:complexContent>
+            </xs:complexType>
+            <xs:complexType name="Ventas_NasaRespuestaMunicipios">
+                <xs:complexContent>
+                    <xs:extension base="ax240:NasaRespuesta">
+                        <xs:sequence>
+                            <xs:element minOccurs="0" name="municipiosEntidad" nillable="true" type="ax239:MunicipiosEntidad"/>
+                        </xs:sequence>
+                    </xs:extension>
+                </xs:complexContent>
+            </xs:complexType>
+            <xs:complexType name="Ventas_NasaRespuestaPuertos">
+                <xs:complexContent>
+                    <xs:extension base="ax240:NasaRespuesta">
+                        <xs:sequence>
+                            <xs:element minOccurs="0" name="puertosEntidad" nillable="true" type="ax239:PuertosEntidad"/>
+                        </xs:sequence>
+                    </xs:extension>
+                </xs:complexContent>
+            </xs:complexType>
+        </xs:schema>
+        <xs:schema attributeFormDefault="qualified" elementFormDefault="unqualified" targetNamespace="http://entidades.navieraarmas.com/xsd">
+            <xs:complexType name="ContextoBase">
+                <xs:sequence>
+                    <xs:element minOccurs="0" name="codigoAgencia" nillable="true" type="xs:string"/>
+                    <xs:element minOccurs="0" name="codigoIdioma" nillable="true" type="xs:string"/>
+                    <xs:element minOccurs="0" name="codigoUsuario" nillable="true" type="xs:string"/>
+                    <xs:element minOccurs="0" name="firma" nillable="true" type="xs:string"/>
+                    <xs:element minOccurs="0" name="versionXml" nillable="true" type="xs:string"/>
+                </xs:sequence>
+            </xs:complexType>
+            <xs:complexType name="NasaRespuesta">
+                <xs:sequence>
+                    <xs:element minOccurs="0" name="codigo" nillable="true" type="xs:string"/>
+                    <xs:element minOccurs="0" name="firma" nillable="true" type="xs:string"/>
+                    <xs:element minOccurs="0" name="texto" nillable="true" type="xs:string"/>
+                    <xs:element minOccurs="0" name="ttl" nillable="true" type="xs:int"/>
+                    <xs:element minOccurs="0" name="versionXml" nillable="true" type="xs:string"/>
+                </xs:sequence>
+            </xs:complexType>
+        </xs:schema>
+        <xs:schema xmlns:ax241="http://entidades.navieraarmas.com/xsd" attributeFormDefault="qualified" elementFormDefault="unqualified" targetNamespace="http://ventas.entidades.navieraarmas.com/xsd">
+            <xs:import namespace="http://entidades.navieraarmas.com/xsd"/>
+            <xs:complexType name="ContextoEntidad">
+                <xs:complexContent>
+                    <xs:extension base="ax240:ContextoBase">
+                        <xs:sequence/>
+                    </xs:extension>
+                </xs:complexContent>
+            </xs:complexType>
+            <xs:complexType name="PuertoEntidad">
+                <xs:sequence>
+                    <xs:element minOccurs="0" name="codigoPuerto" nillable="true" type="xs:string"/>
+                    <xs:element minOccurs="0" name="flagCambioMuelle" nillable="true" type="xs:int"/>
+                    <xs:element minOccurs="0" name="idPuerto" nillable="true" type="xs:int"/>
+                    <xs:element minOccurs="0" name="textoCorto" nillable="true" type="xs:string"/>
+                    <xs:element minOccurs="0" name="textoLargo" nillable="true" type="xs:string"/>
+                </xs:sequence>
+            </xs:complexType>
+            <xs:complexType name="TiposPasajerosEntidad">
+                <xs:sequence>
+                    <xs:element maxOccurs="unbounded" minOccurs="0" name="tipoPasajeroEntidad" nillable="true" type="ax239:TipoPasajeroEntidad"/>
+                </xs:sequence>
+            </xs:complexType>
+            <xs:complexType name="TipoPasajeroEntidad">
+                <xs:sequence>
+                    <xs:element minOccurs="0" name="flagFechaNacimiento" type="xs:boolean"/>
+                    <xs:element minOccurs="0" name="flagNacionalidad" type="xs:boolean"/>
+                    <xs:element minOccurs="0" name="rangoFechaNacimiento" type="xs:int"/>
+                    <xs:element minOccurs="0" name="rellenaDatos" type="xs:boolean"/>
+                    <xs:element minOccurs="0" name="textoCorto" nillable="true" type="xs:string"/>
+                    <xs:element minOccurs="0" name="textoLargo" nillable="true" type="xs:string"/>
+                    <xs:element minOccurs="0" name="tipoPasajero" nillable="true" type="xs:string"/>
+                </xs:sequence>
+            </xs:complexType>
+            <xs:complexType name="SalidasEntidad">
+                <xs:sequence>
+                    <xs:element maxOccurs="unbounded" minOccurs="0" name="salidaEntidad" nillable="true" type="ax239:SalidaEntidad"/>
+                </xs:sequence>
+            </xs:complexType>
+            <xs:complexType name="SalidaEntidad">
+                <xs:sequence>
+                    <xs:element minOccurs="0" name="barcoEntidad" nillable="true" type="ax239:BarcoEntidad"/>
+                    <xs:element minOccurs="0" name="codigoNaviera" nillable="true" type="xs:string"/>
+                    <xs:element minOccurs="0" name="estadoSalida" nillable="true" type="xs:string"/>
+                    <xs:element minOccurs="0" name="fechaLlegada" nillable="true" type="xs:string"/>
+                    <xs:element minOccurs="0" name="fechaSalida" nillable="true" type="xs:string"/>
+                    <xs:element minOccurs="0" name="horaLlegada" nillable="true" type="xs:string"/>
+                    <xs:element minOccurs="0" name="horaSalida" nillable="true" type="xs:string"/>
+                    <xs:element minOccurs="0" name="muelleLlegadaEntidad" nillable="true" type="ax239:MuelleEntidad"/>
+                    <xs:element minOccurs="0" name="muelleSalidaEntidad" nillable="true" type="ax239:MuelleEntidad"/>
+                    <xs:element minOccurs="0" name="precioEntidad" nillable="true" type="ax239:PrecioEntidad"/>
+                    <xs:element minOccurs="0" name="sentidoSalida" type="xs:int"/>
+                    <xs:element minOccurs="0" name="serviciosVentasEntidad" nillable="true" type="ax239:ServiciosVentasEntidad"/>
+                    <xs:element minOccurs="0" name="tipoSalida" type="xs:int"/>
+                    <xs:element minOccurs="0" name="trayectoEntidad" nillable="true" type="ax239:TrayectoEntidad"/>
+                </xs:sequence>
+            </xs:complexType>
+            <xs:complexType name="BarcoEntidad">
+                <xs:sequence>
+                    <xs:element minOccurs="0" name="codigoBarco" nillable="true" type="xs:string"/>
+                    <xs:element minOccurs="0" name="textoCorto" nillable="true" type="xs:string"/>
+                    <xs:element minOccurs="0" name="textoLargo" nillable="true" type="xs:string"/>
+                    <xs:element minOccurs="0" name="tipoBarco" nillable="true" type="xs:string"/>
+                </xs:sequence>
+            </xs:complexType>
+            <xs:complexType name="MuelleEntidad">
+                <xs:sequence>
+                    <xs:element minOccurs="0" name="codigoMuelle" nillable="true" type="xs:string"/>
+                    <xs:element minOccurs="0" name="textoCorto" nillable="true" type="xs:string"/>
+                    <xs:element minOccurs="0" name="textoLargo" nillable="true" type="xs:string"/>
+                </xs:sequence>
+            </xs:complexType>
+            <xs:complexType name="PrecioEntidad">
+                <xs:sequence>
+                    <xs:element minOccurs="0" name="devolucion" nillable="true" type="xs:double"/>
+                    <xs:element minOccurs="0" name="gastos" nillable="true" type="xs:double"/>
+                    <xs:element minOccurs="0" name="total" nillable="true" type="xs:double"/>
+                </xs:sequence>
+            </xs:complexType>
+            <xs:complexType name="ServiciosVentasEntidad">
+                <xs:sequence>
+                    <xs:element maxOccurs="unbounded" minOccurs="0" name="servicioVentaEntidad" nillable="true" type="ax239:ServicioVentaEntidad"/>
+                </xs:sequence>
+            </xs:complexType>
+            <xs:complexType name="ServicioVentaEntidad">
+                <xs:sequence>
+                    <xs:element minOccurs="0" name="cantidad" type="xs:int"/>
+                    <xs:element minOccurs="0" name="capacidad" nillable="true" type="xs:int"/>
+                    <xs:element minOccurs="0" name="codigoServicioVenta" nillable="true" type="xs:string"/>
+                    <xs:element minOccurs="0" name="disponibilidad" type="xs:boolean"/>
+                    <xs:element minOccurs="0" name="disponibles" nillable="true" type="xs:int"/>
+                    <xs:element minOccurs="0" name="textoCorto" nillable="true" type="xs:string"/>
+                    <xs:element minOccurs="0" name="textoLargo" nillable="true" type="xs:string"/>
+                    <xs:element minOccurs="0" name="tipoServicioVenta" nillable="true" type="xs:string"/>
+                </xs:sequence>
+            </xs:complexType>
+            <xs:complexType name="TrayectoEntidad">
+                <xs:sequence>
+                    <xs:element minOccurs="0" name="flagCompuesto" type="xs:int"/>
+                    <xs:element minOccurs="0" name="puertoDestinoEntidad" nillable="true" type="ax239:PuertoEntidad"/>
+                    <xs:element minOccurs="0" name="puertoOrigenEntidad" nillable="true" type="ax239:PuertoEntidad"/>
+                </xs:sequence>
+            </xs:complexType>
+            <xs:complexType name="PaxsVehsEntidad">
+                <xs:sequence>
+                    <xs:element minOccurs="0" name="agrupador" nillable="true" type="xs:int"/>
+                    <xs:element maxOccurs="unbounded" minOccurs="0" name="paxVehEntidad" nillable="true" type="ax239:PaxVehEntidad"/>
+                    <xs:element minOccurs="0" name="tarifaEntidad" nillable="true" type="ax239:TarifaEntidad"/>
+                </xs:sequence>
+            </xs:complexType>
+            <xs:complexType name="PaxVehEntidad">
+                <xs:sequence>
+                    <xs:element maxOccurs="unbounded" minOccurs="0" name="pasajeroBebeEntidad" nillable="true" type="ax239:PaxEntidad"/>
+                    <xs:element minOccurs="0" name="pasajeroEntidad" nillable="true" type="ax239:PaxEntidad"/>
+                    <xs:element minOccurs="0" name="vehiculoEntidad" nillable="true" type="ax239:VehEntidad"/>
+                </xs:sequence>
+            </xs:complexType>
+            <xs:complexType name="PaxEntidad">
+                <xs:sequence>
+                    <xs:element minOccurs="0" name="apellido1" nillable="true" type="xs:string"/>
+                    <xs:element minOccurs="0" name="apellido2" nillable="true" type="xs:string"/>
+                    <xs:element minOccurs="0" name="bonificacionEntidad" nillable="true" type="ax239:BonificacionEntidad"/>
+                    <xs:element minOccurs="0" name="codigoDocumento" nillable="true" type="xs:string"/>
+                    <xs:element minOccurs="0" name="codigoDocumentoFamiliaNumerosa" nillable="true" type="xs:string"/>
+                    <xs:element minOccurs="0" name="codigoMunicipio" nillable="true" type="xs:string"/>
+                    <xs:element minOccurs="0" name="codigoPais" nillable="true" type="xs:string"/>
+                    <xs:element minOccurs="0" name="fechaNacimiento" nillable="true" type="xs:string"/>
+                    <xs:element minOccurs="0" name="justificacionEntidad" nillable="true" type="ax239:JustificacionEntidad"/>
+                    <xs:element minOccurs="0" name="nombre" nillable="true" type="xs:string"/>
+                    <xs:element minOccurs="0" name="numeroBebes" type="xs:int"/>
+                    <xs:element minOccurs="0" name="numeroMascotas" type="xs:int"/>
+                    <xs:element minOccurs="0" name="sexo" nillable="true" type="xs:string"/>
+                    <xs:element minOccurs="0" name="tipoDocumentoEntidad" nillable="true" type="ax239:TipoDocumentoEntidad"/>
+                    <xs:element minOccurs="0" name="tipoPasajeroEntidad" nillable="true" type="ax239:TipoPasajeroEntidad"/>
+                </xs:sequence>
+            </xs:complexType>
+            <xs:complexType name="BonificacionEntidad">
+                <xs:sequence>
+                    <xs:element minOccurs="0" name="codigoBonificacion" nillable="true" type="xs:string"/>
+                    <xs:element minOccurs="0" name="textoCorto" nillable="true" type="xs:string"/>
+                    <xs:element minOccurs="0" name="textoLargo" nillable="true" type="xs:string"/>
+                </xs:sequence>
+            </xs:complexType>
+            <xs:complexType name="JustificacionEntidad">
+                <xs:sequence>
+                    <xs:element minOccurs="0" name="autorizaFomento" type="xs:boolean"/>
+                    <xs:element minOccurs="0" name="codigoJustificar" type="xs:int"/>
+                    <xs:element minOccurs="0" name="fechaJustificar" nillable="true" type="xs:string"/>
+                </xs:sequence>
+            </xs:complexType>
+            <xs:complexType name="TipoDocumentoEntidad">
+                <xs:sequence>
+                    <xs:element minOccurs="0" name="textoCorto" nillable="true" type="xs:string"/>
+                    <xs:element minOccurs="0" name="textoLargo" nillable="true" type="xs:string"/>
+                    <xs:element minOccurs="0" name="tipoDocumento" nillable="true" type="xs:string"/>
+                </xs:sequence>
+            </xs:complexType>
+            <xs:complexType name="VehEntidad">
+                <xs:sequence>
+                    <xs:element minOccurs="0" name="alto" type="xs:double"/>
+                    <xs:element minOccurs="0" name="ancho" type="xs:double"/>
+                    <xs:element minOccurs="0" name="largo" type="xs:double"/>
+                    <xs:element minOccurs="0" name="marca" nillable="true" type="xs:string"/>
+                    <xs:element minOccurs="0" name="matricula" nillable="true" type="xs:string"/>
+                    <xs:element minOccurs="0" name="metrosExtra" nillable="true" type="xs:double"/>
+                    <xs:element minOccurs="0" name="seguro" nillable="true" type="xs:string"/>
+                    <xs:element minOccurs="0" name="tara" nillable="true" type="xs:int"/>
+                    <xs:element minOccurs="0" name="tipoVehiculo" nillable="true" type="xs:string"/>
+                </xs:sequence>
+            </xs:complexType>
+            <xs:complexType name="TarifaEntidad">
+                <xs:sequence>
+                    <xs:element minOccurs="0" name="codigoTarifa" nillable="true" type="xs:string"/>
+                    <xs:element minOccurs="0" name="textoCorto" nillable="true" type="xs:string"/>
+                    <xs:element minOccurs="0" name="textoLargo" nillable="true" type="xs:string"/>
+                </xs:sequence>
+            </xs:complexType>
+            <xs:complexType name="TarificacionesEntidad">
+                <xs:sequence>
+                    <xs:element maxOccurs="unbounded" minOccurs="0" name="tarificacionEntidad" nillable="true" type="ax239:TarificacionEntidad"/>
+                </xs:sequence>
+            </xs:complexType>
+            <xs:complexType name="TarificacionEntidad">
+                <xs:sequence>
+                    <xs:element minOccurs="0" name="bonificacionEntidad" nillable="true" type="ax239:BonificacionEntidad"/>
+                    <xs:element minOccurs="0" name="precioEntidad" nillable="true" type="ax239:PrecioEntidad"/>
+                    <xs:element minOccurs="0" name="precioIdaEntidad" nillable="true" type="ax239:PrecioEntidad"/>
+                    <xs:element minOccurs="0" name="precioVtaEntidad" nillable="true" type="ax239:PrecioEntidad"/>
+                    <xs:element minOccurs="0" name="tarifaEntidad" nillable="true" type="ax239:TarifaEntidad"/>
+                </xs:sequence>
+            </xs:complexType>
+            <xs:complexType name="DatosExtra">
+                <xs:sequence>
+                    <xs:element minOccurs="0" name="mail" nillable="true" type="xs:string"/>
+                    <xs:element minOccurs="0" name="observaciones" nillable="true" type="xs:string"/>
+                    <xs:element minOccurs="0" name="telefono" nillable="true" type="xs:string"/>
+                </xs:sequence>
+            </xs:complexType>
+            <xs:complexType name="ReservasEntidad">
+                <xs:sequence>
+                    <xs:element maxOccurs="unbounded" minOccurs="0" name="reservaEntidad" nillable="true" type="ax239:ReservaEntidad"/>
+                </xs:sequence>
+            </xs:complexType>
+            <xs:complexType name="ReservaEntidad">
+                <xs:sequence>
+                    <xs:element minOccurs="0" name="fechaValidezReserva" nillable="true" type="xs:string"/>
+                    <xs:element minOccurs="0" name="locataEntidad" nillable="true" type="ax239:LocataEntidad"/>
+                    <xs:element minOccurs="0" name="precioEntidad" nillable="true" type="ax239:PrecioEntidad"/>
+                    <xs:element minOccurs="0" name="precioIdaEntidad" nillable="true" type="ax239:PrecioEntidad"/>
+                    <xs:element minOccurs="0" name="precioVtaEntidad" nillable="true" type="ax239:PrecioEntidad"/>
+                    <xs:element minOccurs="0" name="puntoEntidad" nillable="true" type="ax239:PuntoEntidad"/>
+                    <xs:element maxOccurs="unbounded" minOccurs="0" name="reservaDetalleEntidad" nillable="true" type="ax239:TarificacionDetalleEntidad"/>
+                </xs:sequence>
+            </xs:complexType>
+            <xs:complexType name="LocataEntidad">
+                <xs:sequence>
+                    <xs:element minOccurs="0" name="codigoLocata" nillable="true" type="xs:string"/>
+                </xs:sequence>
+            </xs:complexType>
+            <xs:complexType name="PuntoEntidad">
+                <xs:sequence>
+                    <xs:element minOccurs="0" name="total" type="xs:int"/>
+                </xs:sequence>
+            </xs:complexType>
+            <xs:complexType name="TarificacionDetalleEntidad">
+                <xs:sequence>
+                    <xs:element minOccurs="0" name="bonificacionEntidad" nillable="true" type="ax239:BonificacionEntidad"/>
+                    <xs:element minOccurs="0" name="paxsVehsEntidad" nillable="true" type="ax239:PaxsVehsEntidad"/>
+                    <xs:element minOccurs="0" name="precioEntidad" nillable="true" type="ax239:PrecioEntidad"/>
+                    <xs:element minOccurs="0" name="precioIdaEntidad" nillable="true" type="ax239:PrecioEntidad"/>
+                    <xs:element minOccurs="0" name="precioVtaEntidad" nillable="true" type="ax239:PrecioEntidad"/>
+                    <xs:element minOccurs="0" name="salidasEntidad" nillable="true" type="ax239:SalidasEntidad"/>
+                    <xs:element minOccurs="0" name="tarifaEntidad" nillable="true" type="ax239:TarifaEntidad"/>
+                </xs:sequence>
+            </xs:complexType>
+            <xs:complexType name="PagosEntidad">
+                <xs:sequence>
+                    <xs:element maxOccurs="unbounded" minOccurs="0" name="pagoEntidad" nillable="true" type="ax239:PagoEntidad"/>
+                </xs:sequence>
+            </xs:complexType>
+            <xs:complexType name="PagoEntidad">
+                <xs:sequence>
+                    <xs:element minOccurs="0" name="flagPrepago" type="xs:boolean"/>
+                    <xs:element minOccurs="0" name="formasPagosEntidad" nillable="true" type="ax239:FormasPagosEntidad"/>
+                    <xs:element minOccurs="0" name="locataEntidad" nillable="true" type="ax239:LocataEntidad"/>
+                </xs:sequence>
+            </xs:complexType>
+            <xs:complexType name="FormasPagosEntidad">
+                <xs:sequence>
+                    <xs:element maxOccurs="unbounded" minOccurs="0" name="formaPagoEntidad" nillable="true" type="ax239:FormaPagoEntidad"/>
+                </xs:sequence>
+            </xs:complexType>
+            <xs:complexType name="FormaPagoEntidad">
+                <xs:sequence>
+                    <xs:element minOccurs="0" name="codigoFormaPago" nillable="true" type="xs:string"/>
+                    <xs:element minOccurs="0" name="formaPagoTarjetaCreditoEntidad" nillable="true" type="ax239:FormaPagoTarjetaCreditoEntidad"/>
+                    <xs:element minOccurs="0" name="importe" type="xs:double"/>
+                    <xs:element minOccurs="0" name="precioEntidad" nillable="true" type="ax239:PrecioEntidad"/>
+                    <xs:element minOccurs="0" name="tarjetaCreditoEntidad" nillable="true" type="ax239:TarjetaCreditoEntidad"/>
+                    <xs:element minOccurs="0" name="tipoFormaPago" nillable="true" type="xs:string"/>
+                </xs:sequence>
+            </xs:complexType>
+            <xs:complexType name="FormaPagoTarjetaCreditoEntidad">
+                <xs:sequence>
+                    <xs:element minOccurs="0" name="autorizacion" nillable="true" type="xs:string"/>
+                    <xs:element minOccurs="0" name="comercio" nillable="true" type="xs:string"/>
+                    <xs:element minOccurs="0" name="firma" nillable="true" type="xs:string"/>
+                    <xs:element minOccurs="0" name="operacion" nillable="true" type="xs:string"/>
+                    <xs:element minOccurs="0" name="parametros" nillable="true" type="xs:string"/>
+                    <xs:element minOccurs="0" name="terminal" nillable="true" type="xs:string"/>
+                    <xs:element minOccurs="0" name="url" nillable="true" type="xs:string"/>
+                    <xs:element minOccurs="0" name="urlKO" nillable="true" type="xs:string"/>
+                    <xs:element minOccurs="0" name="urlOK" nillable="true" type="xs:string"/>
+                    <xs:element minOccurs="0" name="urlPago" nillable="true" type="xs:string"/>
+                </xs:sequence>
+            </xs:complexType>
+            <xs:complexType name="TarjetaCreditoEntidad">
+                <xs:sequence>
+                    <xs:element minOccurs="0" name="banda" nillable="true" type="xs:string"/>
+                    <xs:element minOccurs="0" name="caducidad" nillable="true" type="xs:string"/>
+                    <xs:element minOccurs="0" name="cvc2" nillable="true" type="xs:string"/>
+                    <xs:element minOccurs="0" name="tarjeta" nillable="true" type="xs:string"/>
+                    <xs:element minOccurs="0" name="titular" nillable="true" type="xs:string"/>
+                </xs:sequence>
+            </xs:complexType>
+            <xs:complexType name="AccvEntidad">
+                <xs:sequence>
+                    <xs:element minOccurs="0" name="accvBilletesEntidad" nillable="true" type="ax239:AccvBilletesEntidad"/>
+                </xs:sequence>
+            </xs:complexType>
+            <xs:complexType name="AccvBilletesEntidad">
+                <xs:sequence>
+                    <xs:element maxOccurs="unbounded" minOccurs="0" name="accvBilleteEntidad" nillable="true" type="ax239:AccvBilleteEntidad"/>
+                </xs:sequence>
+            </xs:complexType>
+            <xs:complexType name="AccvBilleteEntidad">
+                <xs:sequence>
+                    <xs:element minOccurs="0" name="accvServiciosVentasEntidad" nillable="true" type="ax239:AccvServiciosVentasEntidad"/>
+                    <xs:element minOccurs="0" name="billeteEntidad" nillable="true" type="ax239:BilleteEntidad"/>
+                    <xs:element minOccurs="0" name="bonificacionEntidad" nillable="true" type="ax239:BonificacionEntidad"/>
+                    <xs:element minOccurs="0" name="codigoCliente" nillable="true" type="xs:string"/>
+                    <xs:element minOccurs="0" name="facturasEntidad" nillable="true" type="ax239:FacturasEntidad"/>
+                    <xs:element minOccurs="0" name="formasPagosEntidad" nillable="true" type="ax239:FormasPagosEntidad"/>
+                    <xs:element minOccurs="0" name="mail" nillable="true" type="xs:string"/>
+                    <xs:element minOccurs="0" name="observaciones" nillable="true" type="xs:string"/>
+                    <xs:element minOccurs="0" name="tarifaEntidad" nillable="true" type="ax239:TarifaEntidad"/>
+                    <xs:element minOccurs="0" name="telefono" nillable="true" type="xs:string"/>
+                </xs:sequence>
+            </xs:complexType>
+            <xs:complexType name="AccvServiciosVentasEntidad">
+                <xs:sequence>
+                    <xs:element maxOccurs="unbounded" minOccurs="0" name="accvServicioVentaEntidad" nillable="true" type="ax239:AccvServicioVentaEntidad"/>
+                </xs:sequence>
+            </xs:complexType>
+            <xs:complexType name="AccvServicioVentaEntidad">
+                <xs:sequence>
+                    <xs:element minOccurs="0" name="estadosEntidad" nillable="true" type="ax239:EstadosEntidad"/>
+                    <xs:element minOccurs="0" name="locataEntidad" nillable="true" type="ax239:LocataEntidad"/>
+                    <xs:element minOccurs="0" name="paxsVehsEntidad" nillable="true" type="ax239:PaxsVehsEntidad"/>
+                    <xs:element minOccurs="0" name="puedeImprimirIda" nillable="true" type="xs:boolean"/>
+                    <xs:element minOccurs="0" name="puedeImprimirVuelta" nillable="true" type="xs:boolean"/>
+                    <xs:element minOccurs="0" name="salidasEntidad" nillable="true" type="ax239:SalidasEntidad"/>
+                </xs:sequence>
+            </xs:complexType>
+            <xs:complexType name="EstadosEntidad">
+                <xs:sequence>
+                    <xs:element maxOccurs="unbounded" minOccurs="0" name="estadoEntidad" nillable="true" type="ax239:EstadoEntidad"/>
+                </xs:sequence>
+            </xs:complexType>
+            <xs:complexType name="EstadoEntidad">
+                <xs:sequence>
+                    <xs:element minOccurs="0" name="codigoAgencia" nillable="true" type="xs:string"/>
+                    <xs:element minOccurs="0" name="codigoEstado" nillable="true" type="xs:string"/>
+                    <xs:element minOccurs="0" name="fecha" nillable="true" type="xs:string"/>
+                </xs:sequence>
+            </xs:complexType>
+            <xs:complexType name="BilleteEntidad">
+                <xs:sequence>
+                    <xs:element minOccurs="0" name="codigoBillete" nillable="true" type="xs:string"/>
+                </xs:sequence>
+            </xs:complexType>
+            <xs:complexType name="FacturasEntidad">
+                <xs:sequence>
+                    <xs:element maxOccurs="unbounded" minOccurs="0" name="facturaEntidad" nillable="true" type="ax239:FacturaEntidad"/>
+                </xs:sequence>
+            </xs:complexType>
+            <xs:complexType name="FacturaEntidad">
+                <xs:sequence>
+                    <xs:element minOccurs="0" name="codigoFactura" nillable="true" type="xs:string"/>
+                    <xs:element minOccurs="0" name="tipoFactura" type="xs:int"/>
+                </xs:sequence>
+            </xs:complexType>
+            <xs:complexType name="SalidasCalendarioEntidad">
+                <xs:sequence>
+                    <xs:element maxOccurs="unbounded" minOccurs="0" name="dias" nillable="true" type="xs:string"/>
+                    <xs:element minOccurs="0" name="fecha" nillable="true" type="xs:string"/>
+                    <xs:element minOccurs="0" name="trayectoEntidad" nillable="true" type="ax239:TrayectoEntidad"/>
+                </xs:sequence>
+            </xs:complexType>
+            <xs:complexType name="PaisEntidad">
+                <xs:sequence>
+                    <xs:element minOccurs="0" name="codigoPais" nillable="true" type="xs:string"/>
+                    <xs:element minOccurs="0" name="textoCorto" nillable="true" type="xs:string"/>
+                    <xs:element minOccurs="0" name="textoLargo" nillable="true" type="xs:string"/>
+                </xs:sequence>
+            </xs:complexType>
+            <xs:complexType name="ProvinciasEntidad">
+                <xs:sequence>
+                    <xs:element maxOccurs="unbounded" minOccurs="0" name="provinciaEntidad" nillable="true" type="ax239:ProvinciaEntidad"/>
+                </xs:sequence>
+            </xs:complexType>
+            <xs:complexType name="ProvinciaEntidad">
+                <xs:sequence>
+                    <xs:element minOccurs="0" name="codigoProvincia" nillable="true" type="xs:string"/>
+                    <xs:element minOccurs="0" name="flagMunicipio" type="xs:boolean"/>
+                    <xs:element minOccurs="0" name="localidadesEntidad" nillable="true" type="ax239:LocalidadesEntidad"/>
+                    <xs:element minOccurs="0" name="municipiosEntidad" nillable="true" type="ax239:MunicipiosEntidad"/>
+                    <xs:element minOccurs="0" name="textoCorto" nillable="true" type="xs:string"/>
+                    <xs:element minOccurs="0" name="textoLargo" nillable="true" type="xs:string"/>
+                </xs:sequence>
+            </xs:complexType>
+            <xs:complexType name="LocalidadesEntidad">
+                <xs:sequence>
+                    <xs:element maxOccurs="unbounded" minOccurs="0" name="localidadEntidad" nillable="true" type="ax239:LocalidadEntidad"/>
+                </xs:sequence>
+            </xs:complexType>
+            <xs:complexType name="LocalidadEntidad">
+                <xs:sequence>
+                    <xs:element minOccurs="0" name="codigoLocalidad" nillable="true" type="xs:string"/>
+                    <xs:element minOccurs="0" name="textoCorto" nillable="true" type="xs:string"/>
+                    <xs:element minOccurs="0" name="textoLargo" nillable="true" type="xs:string"/>
+                </xs:sequence>
+            </xs:complexType>
+            <xs:complexType name="MunicipiosEntidad">
+                <xs:sequence>
+                    <xs:element maxOccurs="unbounded" minOccurs="0" name="municipioEntidad" nillable="true" type="ax239:MunicipioEntidad"/>
+                </xs:sequence>
+            </xs:complexType>
+            <xs:complexType name="MunicipioEntidad">
+                <xs:sequence>
+                    <xs:element minOccurs="0" name="codigoMunicipio" nillable="true" type="xs:string"/>
+                    <xs:element minOccurs="0" name="textoCorto" nillable="true" type="xs:string"/>
+                    <xs:element minOccurs="0" name="textoLargo" nillable="true" type="xs:string"/>
+                </xs:sequence>
+            </xs:complexType>
+            <xs:complexType name="PaisesEntidad">
+                <xs:sequence>
+                    <xs:element maxOccurs="unbounded" minOccurs="0" name="paisEntidad" nillable="true" type="ax239:PaisEntidad"/>
+                </xs:sequence>
+            </xs:complexType>
+            <xs:complexType name="TiposDocumentosEntidad">
+                <xs:sequence>
+                    <xs:element maxOccurs="unbounded" minOccurs="0" name="tipoDocumentoEntidad" nillable="true" type="ax239:TipoDocumentoEntidad"/>
+                </xs:sequence>
+            </xs:complexType>
+            <xs:complexType name="TarifasEntidad">
+                <xs:sequence>
+                    <xs:element maxOccurs="unbounded" minOccurs="0" name="tarifaEntidad" nillable="true" type="ax239:TarifaEntidad"/>
+                </xs:sequence>
+            </xs:complexType>
+            <xs:complexType name="TrayectosEntidad">
+                <xs:sequence>
+                    <xs:element maxOccurs="unbounded" minOccurs="0" name="trayectoEntidad" nillable="true" type="ax239:TrayectoEntidad"/>
+                </xs:sequence>
+            </xs:complexType>
+            <xs:complexType name="BonificacionesEntidad">
+                <xs:sequence>
+                    <xs:element maxOccurs="unbounded" minOccurs="0" name="bonificacionEntidad" nillable="true" type="ax239:BonificacionEntidad"/>
+                </xs:sequence>
+            </xs:complexType>
+            <xs:complexType name="PuertosEntidad">
+                <xs:sequence>
+                    <xs:element maxOccurs="unbounded" minOccurs="0" name="puertoEntidad" nillable="true" type="ax239:PuertoEntidad"/>
+                </xs:sequence>
+            </xs:complexType>
+        </xs:schema>
+        <xs:schema xmlns:ax246="http://sv.navieraarmas.com/xsd" xmlns:ax247="http://entidades.navieraarmas.com/xsd" xmlns:ax242="http://ventas.entidades.navieraarmas.com/xsd" attributeFormDefault="qualified" elementFormDefault="unqualified" targetNamespace="http://sv.navieraarmas.com">
+            <xs:import namespace="http://ventas.entidades.navieraarmas.com/xsd"/>
+            <xs:import namespace="http://sv.navieraarmas.com/xsd"/>
+            <xs:import namespace="http://entidades.navieraarmas.com/xsd"/>
+            <xs:element name="nasaTiposPasjeros">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element minOccurs="0" name="contextoEntidad" nillable="true" type="ax242:ContextoEntidad"/>
+                        <xs:element minOccurs="0" name="puertoOrigenEntidad" nillable="true" type="ax242:PuertoEntidad"/>
+                        <xs:element minOccurs="0" name="puertoDestinoEntidad" nillable="true" type="ax242:PuertoEntidad"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+            <xs:element name="nasaTiposPasjerosResponse">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element minOccurs="0" name="return" nillable="true" type="ax246:Ventas_NasaRespuestaTiposPasajeros"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+            <xs:element name="nasaTarificaciones">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element minOccurs="0" name="contextoEntidad" nillable="true" type="ax242:ContextoEntidad"/>
+                        <xs:element minOccurs="0" name="salidasEntidad" nillable="true" type="ax242:SalidasEntidad"/>
+                        <xs:element minOccurs="0" name="paxsVehsEntidad" nillable="true" type="ax242:PaxsVehsEntidad"/>
+                        <xs:element minOccurs="0" name="bonificacionEntidad" nillable="true" type="ax242:BonificacionEntidad"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+            <xs:element name="nasaTarificacionesResponse">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element minOccurs="0" name="return" nillable="true" type="ax246:Ventas_NasaRespuestaTarificaciones"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+            <xs:element name="nasaReservas">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element minOccurs="0" name="contextoEntidad" nillable="true" type="ax242:ContextoEntidad"/>
+                        <xs:element minOccurs="0" name="salidasEntidad" nillable="true" type="ax242:SalidasEntidad"/>
+                        <xs:element minOccurs="0" name="paxsVehsEntidad" nillable="true" type="ax242:PaxsVehsEntidad"/>
+                        <xs:element minOccurs="0" name="tarifaEntidad" nillable="true" type="ax242:TarifaEntidad"/>
+                        <xs:element minOccurs="0" name="bonificacionEntidad" nillable="true" type="ax242:BonificacionEntidad"/>
+                        <xs:element minOccurs="0" name="datosExtraEntidad" nillable="true" type="ax242:DatosExtra"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+            <xs:element name="nasaReservasResponse">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element minOccurs="0" name="return" nillable="true" type="ax246:Ventas_NasaRespuestaReservas"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+            <xs:element name="nasaPagos">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element minOccurs="0" name="contextoEntidad" nillable="true" type="ax242:ContextoEntidad"/>
+                        <xs:element minOccurs="0" name="pagosEntidad" nillable="true" type="ax242:PagosEntidad"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+            <xs:element name="nasaPagosResponse">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element minOccurs="0" name="return" nillable="true" type="ax246:Ventas_NasaRespuestaPagos"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+            <xs:element name="nasaDevoluciones">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element minOccurs="0" name="contextoEntidad" nillable="true" type="ax242:ContextoEntidad"/>
+                        <xs:element minOccurs="0" name="pagosEntidad" nillable="true" type="ax242:PagosEntidad"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+            <xs:element name="nasaDevolucionesResponse">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element minOccurs="0" name="return" nillable="true" type="ax246:Ventas_NasaRespuestaDevoluciones"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+            <xs:element name="nasaRecuperaVenta">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element minOccurs="0" name="contextoEntidad" nillable="true" type="ax242:ContextoEntidad"/>
+                        <xs:element minOccurs="0" name="locataEntidad" nillable="true" type="ax242:LocataEntidad"/>
+                        <xs:element minOccurs="0" name="paxEntidad" nillable="true" type="ax242:PaxEntidad"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+            <xs:element name="nasaRecuperaVentaResponse">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element minOccurs="0" name="return" nillable="true" type="ax246:Ventas_NasaRespuestaRecuperaVenta"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+            <xs:element name="nasaRecuperaVentas">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element minOccurs="0" name="contextoEntidad" nillable="true" type="ax242:ContextoEntidad"/>
+                        <xs:element minOccurs="0" name="fechaIni" nillable="true" type="xs:string"/>
+                        <xs:element minOccurs="0" name="fechaFin" nillable="true" type="xs:string"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+            <xs:element name="nasaRecuperaVentasResponse">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element minOccurs="0" name="return" nillable="true" type="ax246:Ventas_NasaRespuestaRecuperaVentas"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+            <xs:element name="nasaCambioFecha">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element minOccurs="0" name="contextoEntidad" nillable="true" type="ax242:ContextoEntidad"/>
+                        <xs:element minOccurs="0" name="locataEntidad" nillable="true" type="ax242:LocataEntidad"/>
+                        <xs:element minOccurs="0" name="salidaEntidad" nillable="true" type="ax242:SalidaEntidad"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+            <xs:element name="nasaCambioFechaResponse">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element minOccurs="0" name="return" nillable="true" type="ax240:NasaRespuesta"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+            <xs:element name="nasaCancelaReserva">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element minOccurs="0" name="contextoEntidad" nillable="true" type="ax242:ContextoEntidad"/>
+                        <xs:element minOccurs="0" name="locataEntidad" nillable="true" type="ax242:LocataEntidad"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+            <xs:element name="nasaCancelaReservaResponse">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element minOccurs="0" name="return" nillable="true" type="ax240:NasaRespuesta"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+            <xs:element name="nasaSalidasCalendario">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element minOccurs="0" name="contextoEntidad" nillable="true" type="ax242:ContextoEntidad"/>
+                        <xs:element minOccurs="0" name="puertoOrigenEntidad" nillable="true" type="ax242:PuertoEntidad"/>
+                        <xs:element minOccurs="0" name="puertoDestinoEntidad" nillable="true" type="ax242:PuertoEntidad"/>
+                        <xs:element minOccurs="0" name="fecha" nillable="true" type="xs:string"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+            <xs:element name="nasaSalidasCalendarioResponse">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element minOccurs="0" name="return" nillable="true" type="ax246:Ventas_NasaRespuestaSalidasCalendario"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+            <xs:element name="nasaProvincias">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element minOccurs="0" name="contextoEntidad" nillable="true" type="ax242:ContextoEntidad"/>
+                        <xs:element minOccurs="0" name="paisEntidad" nillable="true" type="ax242:PaisEntidad"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+            <xs:element name="nasaProvinciasResponse">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element minOccurs="0" name="return" nillable="true" type="ax246:Ventas_NasaRespuestaProvincias"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+            <xs:element name="nasaSalidasDetalle">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element minOccurs="0" name="contextoEntidad" nillable="true" type="ax242:ContextoEntidad"/>
+                        <xs:element minOccurs="0" name="puertoOrigenEntidad" nillable="true" type="ax242:PuertoEntidad"/>
+                        <xs:element minOccurs="0" name="puertoDestinoEntidad" nillable="true" type="ax242:PuertoEntidad"/>
+                        <xs:element minOccurs="0" name="fecha" nillable="true" type="xs:string"/>
+                        <xs:element minOccurs="0" name="hora" nillable="true" type="xs:string"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+            <xs:element name="nasaSalidasDetalleResponse">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element minOccurs="0" name="return" nillable="true" type="ax246:Ventas_NasaRespuestaSalidasDetalle"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+            <xs:element name="nasaPaises">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element minOccurs="0" name="contextoEntidad" nillable="true" type="ax242:ContextoEntidad"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+            <xs:element name="nasaPaisesResponse">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element minOccurs="0" name="return" nillable="true" type="ax246:Ventas_NasaRespuestaPaises"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+            <xs:element name="nasaTiposDocumentos">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element minOccurs="0" name="contextoEntidad" nillable="true" type="ax242:ContextoEntidad"/>
+                        <xs:element minOccurs="0" name="puertoOrigenEntidad" nillable="true" type="ax242:PuertoEntidad"/>
+                        <xs:element minOccurs="0" name="puertoDestinoEntidad" nillable="true" type="ax242:PuertoEntidad"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+            <xs:element name="nasaTiposDocumentosResponse">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element minOccurs="0" name="return" nillable="true" type="ax246:Ventas_NasaRespuestaTiposDocumentos"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+            <xs:element name="nasaTarifas">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element minOccurs="0" name="contextoEntidad" nillable="true" type="ax242:ContextoEntidad"/>
+                        <xs:element minOccurs="0" name="puertoOrigenEntidad" nillable="true" type="ax242:PuertoEntidad"/>
+                        <xs:element minOccurs="0" name="puertoDestinoEntidad" nillable="true" type="ax242:PuertoEntidad"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+            <xs:element name="nasaTarifasResponse">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element minOccurs="0" name="return" nillable="true" type="ax246:Ventas_NasaRespuestaTarifas"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+            <xs:element name="nasaSalidas">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element minOccurs="0" name="contextoEntidad" nillable="true" type="ax242:ContextoEntidad"/>
+                        <xs:element minOccurs="0" name="puertoOrigenEntidad" nillable="true" type="ax242:PuertoEntidad"/>
+                        <xs:element minOccurs="0" name="puertoDestinoEntidad" nillable="true" type="ax242:PuertoEntidad"/>
+                        <xs:element minOccurs="0" name="fecha" nillable="true" type="xs:string"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+            <xs:element name="nasaSalidasResponse">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element minOccurs="0" name="return" nillable="true" type="ax246:Ventas_NasaRespuestaSalidas"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+            <xs:element name="nasaTrayectos">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element minOccurs="0" name="contextoEntidad" nillable="true" type="ax242:ContextoEntidad"/>
+                        <xs:element minOccurs="0" name="puertoOrigenEntidad" nillable="true" type="ax242:PuertoEntidad"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+            <xs:element name="nasaTrayectosResponse">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element minOccurs="0" name="return" nillable="true" type="ax246:Ventas_NasaRespuestaTrayectos"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+            <xs:element name="nasaBonificaciones">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element minOccurs="0" name="contextoEntidad" nillable="true" type="ax242:ContextoEntidad"/>
+                        <xs:element minOccurs="0" name="puertoOrigenEntidad" nillable="true" type="ax242:PuertoEntidad"/>
+                        <xs:element minOccurs="0" name="puertoDestinoEntidad" nillable="true" type="ax242:PuertoEntidad"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+            <xs:element name="nasaBonificacionesResponse">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element minOccurs="0" name="return" nillable="true" type="ax246:Ventas_NasaRespuestaBonificaciones"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+            <xs:element name="nasaLocalidades">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element minOccurs="0" name="contextoEntidad" nillable="true" type="ax242:ContextoEntidad"/>
+                        <xs:element minOccurs="0" name="provinciaEntidad" nillable="true" type="ax242:ProvinciaEntidad"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+            <xs:element name="nasaLocalidadesResponse">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element minOccurs="0" name="return" nillable="true" type="ax246:Ventas_NasaRespuestaLocalidades"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+            <xs:element name="nasaServiciosVentas">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element minOccurs="0" name="contextoEntidad" nillable="true" type="ax242:ContextoEntidad"/>
+                        <xs:element minOccurs="0" name="puertoOrigenEntidad" nillable="true" type="ax242:PuertoEntidad"/>
+                        <xs:element minOccurs="0" name="puertoDestinoEntidad" nillable="true" type="ax242:PuertoEntidad"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+            <xs:element name="nasaServiciosVentasResponse">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element minOccurs="0" name="return" nillable="true" type="ax246:Ventas_NasaRespuestaServiciosVentas"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+            <xs:element name="nasaMunicipios">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element minOccurs="0" name="contextoEntidad" nillable="true" type="ax242:ContextoEntidad"/>
+                        <xs:element minOccurs="0" name="provinciaEntidad" nillable="true" type="ax242:ProvinciaEntidad"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+            <xs:element name="nasaMunicipiosResponse">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element minOccurs="0" name="return" nillable="true" type="ax246:Ventas_NasaRespuestaMunicipios"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+            <xs:element name="nasaPuertos">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element minOccurs="0" name="contextoEntidad" nillable="true" type="ax242:ContextoEntidad"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+            <xs:element name="nasaPuertosResponse">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element minOccurs="0" name="return" nillable="true" type="ax246:Ventas_NasaRespuestaPuertos"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+        </xs:schema>
+    </wsdl:types>
+    <wsdl:message name="nasaMunicipiosRequest">
+        <wsdl:part name="parameters" element="ns:nasaMunicipios"/>
+    </wsdl:message>
+    <wsdl:message name="nasaMunicipiosResponse">
+        <wsdl:part name="parameters" element="ns:nasaMunicipiosResponse"/>
+    </wsdl:message>
+    <wsdl:message name="nasaSalidasDetalleRequest">
+        <wsdl:part name="parameters" element="ns:nasaSalidasDetalle"/>
+    </wsdl:message>
+    <wsdl:message name="nasaSalidasDetalleResponse">
+        <wsdl:part name="parameters" element="ns:nasaSalidasDetalleResponse"/>
+    </wsdl:message>
+    <wsdl:message name="nasaPuertosRequest">
+        <wsdl:part name="parameters" element="ns:nasaPuertos"/>
+    </wsdl:message>
+    <wsdl:message name="nasaPuertosResponse">
+        <wsdl:part name="parameters" element="ns:nasaPuertosResponse"/>
+    </wsdl:message>
+    <wsdl:message name="nasaTarificacionesRequest">
+        <wsdl:part name="parameters" element="ns:nasaTarificaciones"/>
+    </wsdl:message>
+    <wsdl:message name="nasaTarificacionesResponse">
+        <wsdl:part name="parameters" element="ns:nasaTarificacionesResponse"/>
+    </wsdl:message>
+    <wsdl:message name="nasaReservasRequest">
+        <wsdl:part name="parameters" element="ns:nasaReservas"/>
+    </wsdl:message>
+    <wsdl:message name="nasaReservasResponse">
+        <wsdl:part name="parameters" element="ns:nasaReservasResponse"/>
+    </wsdl:message>
+    <wsdl:message name="nasaPaisesRequest">
+        <wsdl:part name="parameters" element="ns:nasaPaises"/>
+    </wsdl:message>
+    <wsdl:message name="nasaPaisesResponse">
+        <wsdl:part name="parameters" element="ns:nasaPaisesResponse"/>
+    </wsdl:message>
+    <wsdl:message name="nasaTiposDocumentosRequest">
+        <wsdl:part name="parameters" element="ns:nasaTiposDocumentos"/>
+    </wsdl:message>
+    <wsdl:message name="nasaTiposDocumentosResponse">
+        <wsdl:part name="parameters" element="ns:nasaTiposDocumentosResponse"/>
+    </wsdl:message>
+    <wsdl:message name="nasaCancelaReservaRequest">
+        <wsdl:part name="parameters" element="ns:nasaCancelaReserva"/>
+    </wsdl:message>
+    <wsdl:message name="nasaCancelaReservaResponse">
+        <wsdl:part name="parameters" element="ns:nasaCancelaReservaResponse"/>
+    </wsdl:message>
+    <wsdl:message name="nasaTrayectosRequest">
+        <wsdl:part name="parameters" element="ns:nasaTrayectos"/>
+    </wsdl:message>
+    <wsdl:message name="nasaTrayectosResponse">
+        <wsdl:part name="parameters" element="ns:nasaTrayectosResponse"/>
+    </wsdl:message>
+    <wsdl:message name="nasaCambioFechaRequest">
+        <wsdl:part name="parameters" element="ns:nasaCambioFecha"/>
+    </wsdl:message>
+    <wsdl:message name="nasaCambioFechaResponse">
+        <wsdl:part name="parameters" element="ns:nasaCambioFechaResponse"/>
+    </wsdl:message>
+    <wsdl:message name="nasaLocalidadesRequest">
+        <wsdl:part name="parameters" element="ns:nasaLocalidades"/>
+    </wsdl:message>
+    <wsdl:message name="nasaLocalidadesResponse">
+        <wsdl:part name="parameters" element="ns:nasaLocalidadesResponse"/>
+    </wsdl:message>
+    <wsdl:message name="nasaPagosRequest">
+        <wsdl:part name="parameters" element="ns:nasaPagos"/>
+    </wsdl:message>
+    <wsdl:message name="nasaPagosResponse">
+        <wsdl:part name="parameters" element="ns:nasaPagosResponse"/>
+    </wsdl:message>
+    <wsdl:message name="nasaSalidasCalendarioRequest">
+        <wsdl:part name="parameters" element="ns:nasaSalidasCalendario"/>
+    </wsdl:message>
+    <wsdl:message name="nasaSalidasCalendarioResponse">
+        <wsdl:part name="parameters" element="ns:nasaSalidasCalendarioResponse"/>
+    </wsdl:message>
+    <wsdl:message name="nasaSalidasRequest">
+        <wsdl:part name="parameters" element="ns:nasaSalidas"/>
+    </wsdl:message>
+    <wsdl:message name="nasaSalidasResponse">
+        <wsdl:part name="parameters" element="ns:nasaSalidasResponse"/>
+    </wsdl:message>
+    <wsdl:message name="nasaTarifasRequest">
+        <wsdl:part name="parameters" element="ns:nasaTarifas"/>
+    </wsdl:message>
+    <wsdl:message name="nasaTarifasResponse">
+        <wsdl:part name="parameters" element="ns:nasaTarifasResponse"/>
+    </wsdl:message>
+    <wsdl:message name="nasaRecuperaVentaRequest">
+        <wsdl:part name="parameters" element="ns:nasaRecuperaVenta"/>
+    </wsdl:message>
+    <wsdl:message name="nasaRecuperaVentaResponse">
+        <wsdl:part name="parameters" element="ns:nasaRecuperaVentaResponse"/>
+    </wsdl:message>
+    <wsdl:message name="nasaProvinciasRequest">
+        <wsdl:part name="parameters" element="ns:nasaProvincias"/>
+    </wsdl:message>
+    <wsdl:message name="nasaProvinciasResponse">
+        <wsdl:part name="parameters" element="ns:nasaProvinciasResponse"/>
+    </wsdl:message>
+    <wsdl:message name="nasaTiposPasjerosRequest">
+        <wsdl:part name="parameters" element="ns:nasaTiposPasjeros"/>
+    </wsdl:message>
+    <wsdl:message name="nasaTiposPasjerosResponse">
+        <wsdl:part name="parameters" element="ns:nasaTiposPasjerosResponse"/>
+    </wsdl:message>
+    <wsdl:message name="nasaServiciosVentasRequest">
+        <wsdl:part name="parameters" element="ns:nasaServiciosVentas"/>
+    </wsdl:message>
+    <wsdl:message name="nasaServiciosVentasResponse">
+        <wsdl:part name="parameters" element="ns:nasaServiciosVentasResponse"/>
+    </wsdl:message>
+    <wsdl:message name="nasaDevolucionesRequest">
+        <wsdl:part name="parameters" element="ns:nasaDevoluciones"/>
+    </wsdl:message>
+    <wsdl:message name="nasaDevolucionesResponse">
+        <wsdl:part name="parameters" element="ns:nasaDevolucionesResponse"/>
+    </wsdl:message>
+    <wsdl:message name="nasaRecuperaVentasRequest">
+        <wsdl:part name="parameters" element="ns:nasaRecuperaVentas"/>
+    </wsdl:message>
+    <wsdl:message name="nasaRecuperaVentasResponse">
+        <wsdl:part name="parameters" element="ns:nasaRecuperaVentasResponse"/>
+    </wsdl:message>
+    <wsdl:message name="nasaBonificacionesRequest">
+        <wsdl:part name="parameters" element="ns:nasaBonificaciones"/>
+    </wsdl:message>
+    <wsdl:message name="nasaBonificacionesResponse">
+        <wsdl:part name="parameters" element="ns:nasaBonificacionesResponse"/>
+    </wsdl:message>
+    <wsdl:portType name="VentasPortType">
+        <wsdl:operation name="nasaMunicipios">
+            <wsdl:input message="ns:nasaMunicipiosRequest" wsaw:Action="urn:nasaMunicipios"/>
+            <wsdl:output message="ns:nasaMunicipiosResponse" wsaw:Action="urn:nasaMunicipiosResponse"/>
+        </wsdl:operation>
+        <wsdl:operation name="nasaSalidasDetalle">
+            <wsdl:input message="ns:nasaSalidasDetalleRequest" wsaw:Action="urn:nasaSalidasDetalle"/>
+            <wsdl:output message="ns:nasaSalidasDetalleResponse" wsaw:Action="urn:nasaSalidasDetalleResponse"/>
+        </wsdl:operation>
+        <wsdl:operation name="nasaPuertos">
+            <wsdl:input message="ns:nasaPuertosRequest" wsaw:Action="urn:nasaPuertos"/>
+            <wsdl:output message="ns:nasaPuertosResponse" wsaw:Action="urn:nasaPuertosResponse"/>
+        </wsdl:operation>
+        <wsdl:operation name="nasaTarificaciones">
+            <wsdl:input message="ns:nasaTarificacionesRequest" wsaw:Action="urn:nasaTarificaciones"/>
+            <wsdl:output message="ns:nasaTarificacionesResponse" wsaw:Action="urn:nasaTarificacionesResponse"/>
+        </wsdl:operation>
+        <wsdl:operation name="nasaReservas">
+            <wsdl:input message="ns:nasaReservasRequest" wsaw:Action="urn:nasaReservas"/>
+            <wsdl:output message="ns:nasaReservasResponse" wsaw:Action="urn:nasaReservasResponse"/>
+        </wsdl:operation>
+        <wsdl:operation name="nasaPaises">
+            <wsdl:input message="ns:nasaPaisesRequest" wsaw:Action="urn:nasaPaises"/>
+            <wsdl:output message="ns:nasaPaisesResponse" wsaw:Action="urn:nasaPaisesResponse"/>
+        </wsdl:operation>
+        <wsdl:operation name="nasaTiposDocumentos">
+            <wsdl:input message="ns:nasaTiposDocumentosRequest" wsaw:Action="urn:nasaTiposDocumentos"/>
+            <wsdl:output message="ns:nasaTiposDocumentosResponse" wsaw:Action="urn:nasaTiposDocumentosResponse"/>
+        </wsdl:operation>
+        <wsdl:operation name="nasaCancelaReserva">
+            <wsdl:input message="ns:nasaCancelaReservaRequest" wsaw:Action="urn:nasaCancelaReserva"/>
+            <wsdl:output message="ns:nasaCancelaReservaResponse" wsaw:Action="urn:nasaCancelaReservaResponse"/>
+        </wsdl:operation>
+        <wsdl:operation name="nasaTrayectos">
+            <wsdl:input message="ns:nasaTrayectosRequest" wsaw:Action="urn:nasaTrayectos"/>
+            <wsdl:output message="ns:nasaTrayectosResponse" wsaw:Action="urn:nasaTrayectosResponse"/>
+        </wsdl:operation>
+        <wsdl:operation name="nasaCambioFecha">
+            <wsdl:input message="ns:nasaCambioFechaRequest" wsaw:Action="urn:nasaCambioFecha"/>
+            <wsdl:output message="ns:nasaCambioFechaResponse" wsaw:Action="urn:nasaCambioFechaResponse"/>
+        </wsdl:operation>
+        <wsdl:operation name="nasaLocalidades">
+            <wsdl:input message="ns:nasaLocalidadesRequest" wsaw:Action="urn:nasaLocalidades"/>
+            <wsdl:output message="ns:nasaLocalidadesResponse" wsaw:Action="urn:nasaLocalidadesResponse"/>
+        </wsdl:operation>
+        <wsdl:operation name="nasaPagos">
+            <wsdl:input message="ns:nasaPagosRequest" wsaw:Action="urn:nasaPagos"/>
+            <wsdl:output message="ns:nasaPagosResponse" wsaw:Action="urn:nasaPagosResponse"/>
+        </wsdl:operation>
+        <wsdl:operation name="nasaSalidasCalendario">
+            <wsdl:input message="ns:nasaSalidasCalendarioRequest" wsaw:Action="urn:nasaSalidasCalendario"/>
+            <wsdl:output message="ns:nasaSalidasCalendarioResponse" wsaw:Action="urn:nasaSalidasCalendarioResponse"/>
+        </wsdl:operation>
+        <wsdl:operation name="nasaSalidas">
+            <wsdl:input message="ns:nasaSalidasRequest" wsaw:Action="urn:nasaSalidas"/>
+            <wsdl:output message="ns:nasaSalidasResponse" wsaw:Action="urn:nasaSalidasResponse"/>
+        </wsdl:operation>
+        <wsdl:operation name="nasaTarifas">
+            <wsdl:input message="ns:nasaTarifasRequest" wsaw:Action="urn:nasaTarifas"/>
+            <wsdl:output message="ns:nasaTarifasResponse" wsaw:Action="urn:nasaTarifasResponse"/>
+        </wsdl:operation>
+        <wsdl:operation name="nasaRecuperaVenta">
+            <wsdl:input message="ns:nasaRecuperaVentaRequest" wsaw:Action="urn:nasaRecuperaVenta"/>
+            <wsdl:output message="ns:nasaRecuperaVentaResponse" wsaw:Action="urn:nasaRecuperaVentaResponse"/>
+        </wsdl:operation>
+        <wsdl:operation name="nasaProvincias">
+            <wsdl:input message="ns:nasaProvinciasRequest" wsaw:Action="urn:nasaProvincias"/>
+            <wsdl:output message="ns:nasaProvinciasResponse" wsaw:Action="urn:nasaProvinciasResponse"/>
+        </wsdl:operation>
+        <wsdl:operation name="nasaTiposPasjeros">
+            <wsdl:input message="ns:nasaTiposPasjerosRequest" wsaw:Action="urn:nasaTiposPasjeros"/>
+            <wsdl:output message="ns:nasaTiposPasjerosResponse" wsaw:Action="urn:nasaTiposPasjerosResponse"/>
+        </wsdl:operation>
+        <wsdl:operation name="nasaServiciosVentas">
+            <wsdl:input message="ns:nasaServiciosVentasRequest" wsaw:Action="urn:nasaServiciosVentas"/>
+            <wsdl:output message="ns:nasaServiciosVentasResponse" wsaw:Action="urn:nasaServiciosVentasResponse"/>
+        </wsdl:operation>
+        <wsdl:operation name="nasaDevoluciones">
+            <wsdl:input message="ns:nasaDevolucionesRequest" wsaw:Action="urn:nasaDevoluciones"/>
+            <wsdl:output message="ns:nasaDevolucionesResponse" wsaw:Action="urn:nasaDevolucionesResponse"/>
+        </wsdl:operation>
+        <wsdl:operation name="nasaRecuperaVentas">
+            <wsdl:input message="ns:nasaRecuperaVentasRequest" wsaw:Action="urn:nasaRecuperaVentas"/>
+            <wsdl:output message="ns:nasaRecuperaVentasResponse" wsaw:Action="urn:nasaRecuperaVentasResponse"/>
+        </wsdl:operation>
+        <wsdl:operation name="nasaBonificaciones">
+            <wsdl:input message="ns:nasaBonificacionesRequest" wsaw:Action="urn:nasaBonificaciones"/>
+            <wsdl:output message="ns:nasaBonificacionesResponse" wsaw:Action="urn:nasaBonificacionesResponse"/>
+        </wsdl:operation>
+    </wsdl:portType>
+    <wsdl:binding name="VentasSoap11Binding" type="ns:VentasPortType">
+        <soap:binding transport="http://schemas.xmlsoap.org/soap/http" style="document"/>
+        <wsdl:operation name="nasaMunicipios">
+            <soap:operation soapAction="urn:nasaMunicipios" style="document"/>
+            <wsdl:input>
+                <soap:body use="literal"/>
+            </wsdl:input>
+            <wsdl:output>
+                <soap:body use="literal"/>
+            </wsdl:output>
+        </wsdl:operation>
+        <wsdl:operation name="nasaSalidasDetalle">
+            <soap:operation soapAction="urn:nasaSalidasDetalle" style="document"/>
+            <wsdl:input>
+                <soap:body use="literal"/>
+            </wsdl:input>
+            <wsdl:output>
+                <soap:body use="literal"/>
+            </wsdl:output>
+        </wsdl:operation>
+        <wsdl:operation name="nasaTarificaciones">
+            <soap:operation soapAction="urn:nasaTarificaciones" style="document"/>
+            <wsdl:input>
+                <soap:body use="literal"/>
+            </wsdl:input>
+            <wsdl:output>
+                <soap:body use="literal"/>
+            </wsdl:output>
+        </wsdl:operation>
+        <wsdl:operation name="nasaPuertos">
+            <soap:operation soapAction="urn:nasaPuertos" style="document"/>
+            <wsdl:input>
+                <soap:body use="literal"/>
+            </wsdl:input>
+            <wsdl:output>
+                <soap:body use="literal"/>
+            </wsdl:output>
+        </wsdl:operation>
+        <wsdl:operation name="nasaReservas">
+            <soap:operation soapAction="urn:nasaReservas" style="document"/>
+            <wsdl:input>
+                <soap:body use="literal"/>
+            </wsdl:input>
+            <wsdl:output>
+                <soap:body use="literal"/>
+            </wsdl:output>
+        </wsdl:operation>
+        <wsdl:operation name="nasaPaises">
+            <soap:operation soapAction="urn:nasaPaises" style="document"/>
+            <wsdl:input>
+                <soap:body use="literal"/>
+            </wsdl:input>
+            <wsdl:output>
+                <soap:body use="literal"/>
+            </wsdl:output>
+        </wsdl:operation>
+        <wsdl:operation name="nasaTiposDocumentos">
+            <soap:operation soapAction="urn:nasaTiposDocumentos" style="document"/>
+            <wsdl:input>
+                <soap:body use="literal"/>
+            </wsdl:input>
+            <wsdl:output>
+                <soap:body use="literal"/>
+            </wsdl:output>
+        </wsdl:operation>
+        <wsdl:operation name="nasaCancelaReserva">
+            <soap:operation soapAction="urn:nasaCancelaReserva" style="document"/>
+            <wsdl:input>
+                <soap:body use="literal"/>
+            </wsdl:input>
+            <wsdl:output>
+                <soap:body use="literal"/>
+            </wsdl:output>
+        </wsdl:operation>
+        <wsdl:operation name="nasaTrayectos">
+            <soap:operation soapAction="urn:nasaTrayectos" style="document"/>
+            <wsdl:input>
+                <soap:body use="literal"/>
+            </wsdl:input>
+            <wsdl:output>
+                <soap:body use="literal"/>
+            </wsdl:output>
+        </wsdl:operation>
+        <wsdl:operation name="nasaCambioFecha">
+            <soap:operation soapAction="urn:nasaCambioFecha" style="document"/>
+            <wsdl:input>
+                <soap:body use="literal"/>
+            </wsdl:input>
+            <wsdl:output>
+                <soap:body use="literal"/>
+            </wsdl:output>
+        </wsdl:operation>
+        <wsdl:operation name="nasaLocalidades">
+            <soap:operation soapAction="urn:nasaLocalidades" style="document"/>
+            <wsdl:input>
+                <soap:body use="literal"/>
+            </wsdl:input>
+            <wsdl:output>
+                <soap:body use="literal"/>
+            </wsdl:output>
+        </wsdl:operation>
+        <wsdl:operation name="nasaPagos">
+            <soap:operation soapAction="urn:nasaPagos" style="document"/>
+            <wsdl:input>
+                <soap:body use="literal"/>
+            </wsdl:input>
+            <wsdl:output>
+                <soap:body use="literal"/>
+            </wsdl:output>
+        </wsdl:operation>
+        <wsdl:operation name="nasaSalidasCalendario">
+            <soap:operation soapAction="urn:nasaSalidasCalendario" style="document"/>
+            <wsdl:input>
+                <soap:body use="literal"/>
+            </wsdl:input>
+            <wsdl:output>
+                <soap:body use="literal"/>
+            </wsdl:output>
+        </wsdl:operation>
+        <wsdl:operation name="nasaSalidas">
+            <soap:operation soapAction="urn:nasaSalidas" style="document"/>
+            <wsdl:input>
+                <soap:body use="literal"/>
+            </wsdl:input>
+            <wsdl:output>
+                <soap:body use="literal"/>
+            </wsdl:output>
+        </wsdl:operation>
+        <wsdl:operation name="nasaTarifas">
+            <soap:operation soapAction="urn:nasaTarifas" style="document"/>
+            <wsdl:input>
+                <soap:body use="literal"/>
+            </wsdl:input>
+            <wsdl:output>
+                <soap:body use="literal"/>
+            </wsdl:output>
+        </wsdl:operation>
+        <wsdl:operation name="nasaRecuperaVenta">
+            <soap:operation soapAction="urn:nasaRecuperaVenta" style="document"/>
+            <wsdl:input>
+                <soap:body use="literal"/>
+            </wsdl:input>
+            <wsdl:output>
+                <soap:body use="literal"/>
+            </wsdl:output>
+        </wsdl:operation>
+        <wsdl:operation name="nasaTiposPasjeros">
+            <soap:operation soapAction="urn:nasaTiposPasjeros" style="document"/>
+            <wsdl:input>
+                <soap:body use="literal"/>
+            </wsdl:input>
+            <wsdl:output>
+                <soap:body use="literal"/>
+            </wsdl:output>
+        </wsdl:operation>
+        <wsdl:operation name="nasaProvincias">
+            <soap:operation soapAction="urn:nasaProvincias" style="document"/>
+            <wsdl:input>
+                <soap:body use="literal"/>
+            </wsdl:input>
+            <wsdl:output>
+                <soap:body use="literal"/>
+            </wsdl:output>
+        </wsdl:operation>
+        <wsdl:operation name="nasaServiciosVentas">
+            <soap:operation soapAction="urn:nasaServiciosVentas" style="document"/>
+            <wsdl:input>
+                <soap:body use="literal"/>
+            </wsdl:input>
+            <wsdl:output>
+                <soap:body use="literal"/>
+            </wsdl:output>
+        </wsdl:operation>
+        <wsdl:operation name="nasaDevoluciones">
+            <soap:operation soapAction="urn:nasaDevoluciones" style="document"/>
+            <wsdl:input>
+                <soap:body use="literal"/>
+            </wsdl:input>
+            <wsdl:output>
+                <soap:body use="literal"/>
+            </wsdl:output>
+        </wsdl:operation>
+        <wsdl:operation name="nasaRecuperaVentas">
+            <soap:operation soapAction="urn:nasaRecuperaVentas" style="document"/>
+            <wsdl:input>
+                <soap:body use="literal"/>
+            </wsdl:input>
+            <wsdl:output>
+                <soap:body use="literal"/>
+            </wsdl:output>
+        </wsdl:operation>
+        <wsdl:operation name="nasaBonificaciones">
+            <soap:operation soapAction="urn:nasaBonificaciones" style="document"/>
+            <wsdl:input>
+                <soap:body use="literal"/>
+            </wsdl:input>
+            <wsdl:output>
+                <soap:body use="literal"/>
+            </wsdl:output>
+        </wsdl:operation>
+    </wsdl:binding>
+    <wsdl:service name="Ventas">
+        <wsdl:port name="VentasHttpsSoap11Endpoint" binding="ns:VentasSoap11Binding">
+            <soap:address location="https://secure.navieraarmas.com:8443/nasa_svexterno_ws/services/Ventas.VentasHttpsSoap11Endpoint/"/>
+        </wsdl:port>
+    </wsdl:service>
+</wsdl:definitions>

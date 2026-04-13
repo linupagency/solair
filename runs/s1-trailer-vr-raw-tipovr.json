@@ -1,0 +1,38 @@
+{
+  "probeSpecVersion": "1",
+  "mode": "A",
+  "scenarioId": "S1-trailer-VR-raw-tipoVR",
+  "label": "ALG-PTM 20260413 2130 VR raw avec tipoVehiculo VR",
+  "body": {
+    "origen": "ALG",
+    "destino": "PTM",
+    "fechaSalida": "20260413",
+    "horaSalida": "2130",
+    "cantidad": 1,
+    "codigoServicioVenta": "BY",
+    "tipoServicioVenta": "P",
+    "tipoPasajero": "A",
+    "passengerTipos": ["A"],
+    "bonificacion": "G",
+    "sentidoSalida": 1,
+    "animalsCount": 0,
+    "vehicle": "car",
+    "vehicleCategory": "medium_tourism_car_trailer",
+    "vehicleData": {
+      "marque": "LAB",
+      "modele": "VR-TEST",
+      "immatriculation": "VRTYPE001",
+      "alto": 1.92,
+      "ancho": 1.85,
+      "largo": 8,
+      "tipoVehiculo": "VR"
+    },
+    "companionServicioVenta": {
+      "codigoServicioVenta": "VR",
+      "tipoServicioVenta": "V",
+      "cantidad": 1
+    },
+    "rawTrailerLength": true,
+    "pricingSoapTrace": true
+  }
+}

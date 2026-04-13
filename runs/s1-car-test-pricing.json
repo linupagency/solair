@@ -1,0 +1,66 @@
+{
+  "ok": true,
+  "message": "Appel SOAP nasaTarificaciones exécuté.",
+  "data": {
+    "return": {
+      "attributes": {
+        "xsi:type": "ax227:Ventas_NasaRespuestaTarificaciones"
+      },
+      "codigo": "000001",
+      "firma": "e8c73715ad17790f642eba00c6c854a5",
+      "texto": "",
+      "ttl": 3421,
+      "versionXml": "0.0.0.1",
+      "tarificacionesEntidad": {
+        "attributes": {
+          "xsi:type": "ax220:TarificacionesEntidad"
+        },
+        "tarificacionEntidad": [
+          {
+            "attributes": {
+              "xsi:type": "ax220:TarificacionEntidad"
+            },
+            "bonificacionEntidad": {
+              "attributes": {
+                "xsi:type": "ax220:BonificacionEntidad"
+              },
+              "codigoBonificacion": "G",
+              "textoCorto": "Générale"
+            },
+            "precioEntidad": {
+              "attributes": {
+                "xsi:type": "ax220:PrecioEntidad"
+              },
+              "devolucion": 0,
+              "gastos": 0,
+              "total": 201
+            },
+            "precioIdaEntidad": {
+              "attributes": {
+                "xsi:type": "ax220:PrecioEntidad"
+              },
+              "devolucion": 0,
+              "gastos": 0,
+              "precioDetalleEntidad": {
+                "attributes": {
+                  "xsi:type": "ax220:PrecioDetalleEntidad"
+                },
+                "codigo": "residente",
+                "valor": "0.00"
+              },
+              "total": 201
+            },
+            "tarifaEntidad": {
+              "attributes": {
+                "xsi:type": "ax220:TarifaEntidad"
+              },
+              "codigoTarifa": "G",
+              "textoCorto": "GÉNÉRALE",
+              "textoLargo": ""
+            }
+          }
+        ]
+      }
+    }
+  }
+}
