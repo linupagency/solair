@@ -400,7 +400,8 @@ export default function RecapitulatifPage() {
           codigoServicioVenta: string;
           tipoServicioVenta: string;
         },
-        catalog?: TarificacionCompanionCatalog
+        catalog: TarificacionCompanionCatalog | undefined,
+        armasLeg: "outbound" | "inbound"
       ): Promise<SegmentPricingState> {
         try {
           const built = tryBuildTarificacionPostBodyFromFlow(
@@ -425,7 +426,10 @@ export default function RecapitulatifPage() {
           }
           const priced = await fetchTransportPricing(
             built.body,
-            built.normalizedVehicle
+            built.normalizedVehicle,
+            safeFlow.tripType === "round_trip"
+              ? { tripType: "round_trip", armasLeg }
+              : undefined
           );
           if (!priced.ok) {
             throw new Error(priced.error);
@@ -475,7 +479,8 @@ export default function RecapitulatifPage() {
         },
         safeFlow.outbound.availableServices?.length
           ? { serviciosVentas: safeFlow.outbound.availableServices }
-          : undefined
+          : undefined,
+        "outbound"
       );
 
       setOutboundPricing(outbound);
@@ -497,7 +502,8 @@ export default function RecapitulatifPage() {
           },
           safeFlow.inbound?.availableServices?.length
             ? { serviciosVentas: safeFlow.inbound.availableServices }
-            : undefined
+            : undefined,
+          "inbound"
         );
 
         setInboundPricing(inbound);
@@ -1135,6 +1141,15 @@ export default function RecapitulatifPage() {
                               : inboundPricing.totalDisplay ||
                                 bookingFlow.totals.transportInbound ||
                                 "-"}
+                          </span>
+                        </div>
+
+                        <div className="mt-3 flex items-start justify-between gap-4 border-t border-[#CDE4F7] pt-3">
+                          <span className="text-sm font-semibold text-slate-700">
+                            Total transport (aller + retour)
+                          </span>
+                          <span className="text-right text-sm font-bold text-slate-900">
+                            {formatMoney(transportTotal)}
                           </span>
                         </div>
 

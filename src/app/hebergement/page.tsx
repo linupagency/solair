@@ -395,7 +395,8 @@ export default function HebergementPage() {
       currentFlow: BookingFlow,
       dep: NonNullable<BookingFlow["outbound"]["selectedDeparture"]>,
       codigoServicioVenta: string,
-      tipoServicioVenta: string
+      tipoServicioVenta: string,
+      armasLeg: "outbound" | "inbound"
     ): Promise<number> => {
       const passengerCount = getTotalPassengers(currentFlow);
       const tipos = expandPassengerTipoList(currentFlow.search.passengers);
@@ -422,7 +423,10 @@ export default function HebergementPage() {
       }
       const priced = await fetchTransportPricing(
         built.body,
-        built.normalizedVehicle
+        built.normalizedVehicle,
+        currentFlow.tripType === "round_trip"
+          ? { tripType: "round_trip", armasLeg }
+          : undefined
       );
       if (!priced.ok) {
         throw new Error(priced.error);
@@ -514,7 +518,8 @@ export default function HebergementPage() {
           flow,
           dep,
           base.codigoServicioVenta,
-          base.tipoServicioVenta
+          base.tipoServicioVenta,
+          "outbound"
         );
         if (!cancelled) {
           setOutboundBaseNum(total);
@@ -562,7 +567,8 @@ export default function HebergementPage() {
           flow,
           dep,
           base.codigoServicioVenta,
-          base.tipoServicioVenta
+          base.tipoServicioVenta,
+          "inbound"
         );
         if (!cancelled) {
           setInboundBaseNum(total);
@@ -670,7 +676,8 @@ export default function HebergementPage() {
                 flow,
                 flow.outbound.selectedDeparture!,
                 offer.codigoServicioVenta,
-                offer.tipoServicioVenta
+                offer.tipoServicioVenta,
+                "outbound"
               );
               if (Number.isFinite(n) && n > 0) {
                 nextTotals[key] = n;
@@ -727,7 +734,8 @@ export default function HebergementPage() {
                 flow,
                 flow.inbound!.selectedDeparture!,
                 offer.codigoServicioVenta,
-                offer.tipoServicioVenta
+                offer.tipoServicioVenta,
+                "inbound"
               );
               if (Number.isFinite(n) && n > 0) {
                 nextTotals[key] = n;

@@ -1153,7 +1153,14 @@ function ResultatsPageContent() {
 
             const priced = await fetchTransportPricing(
               built.body,
-              built.normalizedVehicle
+              built.normalizedVehicle,
+              flow.tripType === "round_trip"
+                ? {
+                    tripType: "round_trip",
+                    armasLeg:
+                      direction === "outbound" ? "outbound" : "inbound",
+                  }
+                : undefined
             );
             if (!priced.ok) {
               return [
@@ -1359,6 +1366,27 @@ function ResultatsPageContent() {
     inboundTariffOk,
     canContinue,
   ]);
+
+  const roundTripTransportAmounts = useMemo(() => {
+    if (!flow || flow.tripType !== "round_trip") return null;
+    if (!selectedOutbound || !selectedInbound) return null;
+    const obStr = getCombinedTransportTotalString(
+      flow,
+      "outbound",
+      selectedOutbound,
+      pricingMap
+    );
+    const ibStr = getCombinedTransportTotalString(
+      flow,
+      "inbound",
+      selectedInbound,
+      pricingMap
+    );
+    const ob = parsePricingTotalEuros(obStr);
+    const ib = parsePricingTotalEuros(ibStr);
+    if (ob === null || ib === null) return null;
+    return { outbound: ob, inbound: ib, total: ob + ib };
+  }, [flow, selectedOutbound, selectedInbound, pricingMap]);
 
   function handleSelectChoice(
     direction: JourneyDirection,
@@ -2102,6 +2130,31 @@ function ResultatsPageContent() {
                     <p className="mt-4 text-sm font-medium text-slate-800">
                       {roundTripSelectionHint}
                     </p>
+                    {roundTripTransportAmounts ? (
+                      <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+                        <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                          Transport sélectionné
+                        </p>
+                        <div className="mt-2 space-y-1">
+                          <div className="flex justify-between gap-3">
+                            <span>Aller</span>
+                            <span className="font-semibold text-slate-900">
+                              {formatMoney(roundTripTransportAmounts.outbound)}
+                            </span>
+                          </div>
+                          <div className="flex justify-between gap-3">
+                            <span>Retour</span>
+                            <span className="font-semibold text-slate-900">
+                              {formatMoney(roundTripTransportAmounts.inbound)}
+                            </span>
+                          </div>
+                          <div className="flex justify-between gap-3 border-t border-slate-200 pt-2 font-bold text-slate-900">
+                            <span>Total</span>
+                            <span>{formatMoney(roundTripTransportAmounts.total)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ) : null}
                     {!canContinue ? (
                       <p className="mt-2 text-xs text-amber-900">
                         Le bouton reste désactivé tant que l’aller et le retour ne
@@ -2203,6 +2256,13 @@ function ResultatsPageContent() {
                   </div>
 
                   <div className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 shadow-[0_-6px_24px_rgba(15,23,42,0.12)] backdrop-blur-md lg:hidden">
+                    {roundTripTransportAmounts ? (
+                      <p className="mb-2 text-center text-[11px] font-semibold text-slate-800">
+                        Aller {formatMoney(roundTripTransportAmounts.outbound)} ·
+                        Retour {formatMoney(roundTripTransportAmounts.inbound)} ·
+                        Total {formatMoney(roundTripTransportAmounts.total)}
+                      </p>
+                    ) : null}
                     <p className="mb-2 line-clamp-2 text-center text-[11px] leading-snug text-slate-700">
                       {roundTripSelectionHint}
                     </p>

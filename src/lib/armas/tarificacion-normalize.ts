@@ -59,17 +59,36 @@ function firstTotalInPrecioBlock(
   return undefined;
 }
 
-function pickLinePrecioTotal(
-  line: Record<string, unknown>
+/** Mode de lecture des blocs WSDL `PrecioEntidad` par ligne. */
+export type ArmasTarificacionLegMode = "combined" | "ida_leg" | "vta_leg";
+
+function pickLinePrecioTotalForLegMode(
+  line: Record<string, unknown>,
+  mode: ArmasTarificacionLegMode
 ): string | number | undefined {
   const pe = line.precioEntidad as Record<string, unknown> | undefined;
-  const peTotal = firstTotalInPrecioBlock(pe);
-  if (peTotal !== undefined) return peTotal;
-
   const pi = line.precioIdaEntidad as Record<string, unknown> | undefined;
   const pv = line.precioVtaEntidad as Record<string, unknown> | undefined;
+  const peTotal = firstTotalInPrecioBlock(pe);
   const ti = firstTotalInPrecioBlock(pi);
   const tv = firstTotalInPrecioBlock(pv);
+
+  if (mode === "ida_leg") {
+    if (precioBlockHasTotal(ti)) return ti as string | number;
+    if (precioBlockHasTotal(peTotal)) return peTotal;
+    if (precioBlockHasTotal(tv)) return tv as string | number;
+    return undefined;
+  }
+
+  if (mode === "vta_leg") {
+    if (precioBlockHasTotal(tv)) return tv as string | number;
+    if (precioBlockHasTotal(peTotal)) return peTotal;
+    if (precioBlockHasTotal(ti)) return ti as string | number;
+    return undefined;
+  }
+
+  if (precioBlockHasTotal(peTotal)) return peTotal;
+
   if (precioBlockHasTotal(ti) && precioBlockHasTotal(tv)) {
     const ni = parsePrecioTotalValue(ti);
     const nv = parsePrecioTotalValue(tv);
@@ -81,6 +100,12 @@ function pickLinePrecioTotal(
   return undefined;
 }
 
+function pickLinePrecioTotal(
+  line: Record<string, unknown>
+): string | number | undefined {
+  return pickLinePrecioTotalForLegMode(line, "combined");
+}
+
 /** Pour l’UI : montant affichable d’une `tarificacionEntidad` brute SOAP. */
 export function pickPrecioTotalFromTarificacionRaw(
   line: unknown
@@ -89,19 +114,84 @@ export function pickPrecioTotalFromTarificacionRaw(
   return pickLinePrecioTotal(line as Record<string, unknown>);
 }
 
+export function pickPrecioTotalFromTarificacionRawForLeg(
+  line: unknown,
+  mode: ArmasTarificacionLegMode
+): string | number | undefined {
+  if (!line || typeof line !== "object") return undefined;
+  return pickLinePrecioTotalForLegMode(line as Record<string, unknown>, mode);
+}
+
+/**
+ * Sommes des `total` WSDL sur chaque bloc prix, toutes lignes (debug / contrôle cohérence).
+ */
+export function sumPrecioBlocksFromNasaTarificacionesResult(
+  soapResult: unknown
+): {
+  idaSum: number | null;
+  vtaSum: number | null;
+  peSum: number | null;
+} {
+  const rawLines = getTarificacionRawLinesFromSoapResult(soapResult);
+  let idaAcc = 0;
+  let vtaAcc = 0;
+  let peAcc = 0;
+  let idaAny = false;
+  let vtaAny = false;
+  let peAny = false;
+  for (const line of rawLines) {
+    const L = line as Record<string, unknown>;
+    const pi = firstTotalInPrecioBlock(
+      L.precioIdaEntidad as Record<string, unknown> | undefined
+    );
+    const pv = firstTotalInPrecioBlock(
+      L.precioVtaEntidad as Record<string, unknown> | undefined
+    );
+    const pe = firstTotalInPrecioBlock(
+      L.precioEntidad as Record<string, unknown> | undefined
+    );
+    const ni = parsePrecioTotalValue(pi);
+    const nv = parsePrecioTotalValue(pv);
+    const np = parsePrecioTotalValue(pe);
+    if (ni !== null) {
+      idaAcc += ni;
+      idaAny = true;
+    }
+    if (nv !== null) {
+      vtaAcc += nv;
+      vtaAny = true;
+    }
+    if (np !== null) {
+      peAcc += np;
+      peAny = true;
+    }
+  }
+  return {
+    idaSum: idaAny ? idaAcc : null,
+    vtaSum: vtaAny ? vtaAcc : null,
+    peSum: peAny ? peAcc : null,
+  };
+}
+
 /**
  * Montant affiché : pour chaque `tarificacionEntidad`, total issu de
  * `precioEntidad` puis repli `precioIdaEntidad` / `precioVtaEntidad` (WSDL NASA).
+ *
+ * `ida_leg` / `vta_leg` : lecture segment aller / retour sans additionner ida+vta
+ * (évite de compter deux fois une structure aller-retour sur un appel `nasaTarificaciones` par sens).
  */
 export function sumPrecioTotalFromNasaTarificacionesResult(
-  soapResult: unknown
+  soapResult: unknown,
+  legMode: ArmasTarificacionLegMode = "combined"
 ): number | null {
-  const lines = normalizeNasaTarificacionesLines(soapResult);
-  if (lines.length === 0) return null;
+  const rawLines = getTarificacionRawLinesFromSoapResult(soapResult);
+  if (rawLines.length === 0) return null;
   let sum = 0;
   let any = false;
-  for (const L of lines) {
-    const n = parsePrecioTotalValue(L.precioTotal);
+  for (const line of rawLines) {
+    const L = line as Record<string, unknown>;
+    const picked = pickLinePrecioTotalForLegMode(L, legMode);
+    const n = parsePrecioTotalValue(picked);
     if (n !== null) {
       sum += n;
       any = true;
