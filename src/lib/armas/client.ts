@@ -1,7 +1,10 @@
-import fs from "fs";
 import https from "https";
 import soap from "soap";
-import { armasConfig } from "@/lib/armas/config";
+import {
+  armasConfig,
+  getArmasCertBuffer,
+  getResolvedArmasWsdlUrl,
+} from "@/lib/armas/config";
 import { isCarWithTrailerCategory, type CarTrailerCategory } from "@/lib/solair-vehicle-trailer";
 import {
   armasTipoVehiculoForCategory,
@@ -172,11 +175,8 @@ export function buildArmasContext(): ArmasContext {
 }
 
 function buildHttpsAgent() {
-  if (!armasConfig.certPath) {
-    return undefined;
-  }
-
-  const pfxBuffer = fs.readFileSync(armasConfig.certPath);
+  const pfxBuffer = getArmasCertBuffer();
+  if (!pfxBuffer) return undefined;
 
   return new https.Agent({
     pfx: pfxBuffer,
@@ -187,16 +187,18 @@ function buildHttpsAgent() {
 
 export async function createArmasSoapClient() {
   const httpsAgent = buildHttpsAgent();
+  const pfxBuffer = getArmasCertBuffer();
+  const wsdlUrl = getResolvedArmasWsdlUrl();
 
-  const client = await soap.createClientAsync(armasConfig.wsdlUrl, {
+  const client = await soap.createClientAsync(wsdlUrl, {
     endpoint: armasConfig.endpoint || undefined,
     wsdl_options: httpsAgent ? { httpsAgent } : undefined,
   });
 
-  if (armasConfig.certPath) {
+  if (pfxBuffer) {
     client.setSecurity(
       new soap.ClientSSLSecurityPFX(
-        fs.readFileSync(armasConfig.certPath),
+        pfxBuffer,
         armasConfig.certPassphrase || ""
       )
     );
