@@ -17,6 +17,7 @@ import {
   type BookingAccommodationSelection,
   type BookingFlow,
   type BookingSalidaServiceOffer,
+  type BookingTransportPricingCanonical,
   type BookingTransportServiceRef,
 } from "@/lib/booking-flow";
 import {
@@ -376,6 +377,9 @@ export default function HebergementPage() {
 
   const [outboundBaseNum, setOutboundBaseNum] = useState(0);
   const [inboundBaseNum, setInboundBaseNum] = useState(0);
+  /** Si false : forfait AR sans ventilation ida/vta fiable — le total transport est porté sur l’aller. */
+  const [rtSegmentVentilationReliable, setRtSegmentVentilationReliable] =
+    useState(true);
   const [outboundSegmentNum, setOutboundSegmentNum] = useState(0);
   const [inboundSegmentNum, setInboundSegmentNum] = useState(0);
   const [outboundOptionTotals, setOutboundOptionTotals] = useState<
@@ -440,6 +444,129 @@ export default function HebergementPage() {
     []
   );
 
+  const fetchRoundTripBaseTotals = useCallback(
+    async (
+      currentFlow: BookingFlow
+    ): Promise<{
+      outboundBase: number;
+      inboundBase: number;
+      segmentVentilationReliable: boolean;
+    }> => {
+      if (
+        currentFlow.tripType !== "round_trip" ||
+        !currentFlow.outbound.selectedDeparture ||
+        !currentFlow.inbound?.selectedDeparture
+      ) {
+        throw new Error("Dossier aller-retour incomplet pour tarification AR.");
+      }
+
+      const passengerCount = getTotalPassengers(currentFlow);
+      const tipos = expandPassengerTipoList(currentFlow.search.passengers);
+      const outboundDep = currentFlow.outbound.selectedDeparture;
+      const inboundDep = currentFlow.inbound.selectedDeparture;
+      const outboundBase = currentFlow.outbound.transportBaseService ?? {
+        codigoServicioVenta: outboundDep.codigoServicioVenta,
+        tipoServicioVenta: outboundDep.tipoServicioVenta,
+      };
+      const inboundBase = currentFlow.inbound.transportBaseService ?? {
+        codigoServicioVenta: inboundDep.codigoServicioVenta,
+        tipoServicioVenta: inboundDep.tipoServicioVenta,
+      };
+
+      const outboundBuilt = tryBuildTarificacionPostBodyFromFlow(
+        currentFlow,
+        {
+          origen: outboundDep.origen,
+          destino: outboundDep.destino,
+          fechaSalida: outboundDep.fechaSalida,
+          horaSalida: outboundDep.horaSalida,
+        },
+        {
+          cantidad: passengerCount,
+          codigoServicioVenta: outboundBase.codigoServicioVenta,
+          tipoServicioVenta: outboundBase.tipoServicioVenta,
+          tipoPasajero: tipos[0] || "A",
+          passengerTipos: tipos,
+        },
+        companionCatalogForSelectedDeparture(currentFlow, outboundDep)
+      );
+      if (!outboundBuilt.ok) {
+        throw new Error(outboundBuilt.error);
+      }
+
+      const inboundBuilt = tryBuildTarificacionPostBodyFromFlow(
+        currentFlow,
+        {
+          origen: inboundDep.origen,
+          destino: inboundDep.destino,
+          fechaSalida: inboundDep.fechaSalida,
+          horaSalida: inboundDep.horaSalida,
+        },
+        {
+          cantidad: passengerCount,
+          codigoServicioVenta: inboundBase.codigoServicioVenta,
+          tipoServicioVenta: inboundBase.tipoServicioVenta,
+          tipoPasajero: tipos[0] || "A",
+          passengerTipos: tipos,
+        },
+        companionCatalogForSelectedDeparture(currentFlow, inboundDep)
+      );
+      if (!inboundBuilt.ok) {
+        throw new Error(inboundBuilt.error);
+      }
+
+      const priced = await fetchTransportPricing(
+        outboundBuilt.body,
+        outboundBuilt.normalizedVehicle,
+        {
+          tripType: "round_trip",
+          armasLeg: "outbound",
+          returnSegment: {
+            origen: inboundBuilt.body.origen,
+            destino: inboundBuilt.body.destino,
+            fechaSalida: inboundBuilt.body.fechaSalida,
+            horaSalida: inboundBuilt.body.horaSalida,
+            codigoServicioVenta: inboundBuilt.body.codigoServicioVenta,
+            tipoServicioVenta: inboundBuilt.body.tipoServicioVenta,
+            sentidoSalida: 2,
+          },
+        }
+      );
+      if (!priced.ok) {
+        throw new Error(priced.error);
+      }
+
+      const bundle = priced.roundTripTotalEuros ?? priced.totalEuros;
+      if (bundle == null || !Number.isFinite(bundle) || bundle <= 0) {
+        throw new Error("Réponse AR sans total aller-retour exploitable.");
+      }
+      const segmentVentilationReliable = priced.segmentVentilationReliable === true;
+      if (segmentVentilationReliable) {
+        const outbound = priced.outboundEuros;
+        const inbound = priced.returnEuros;
+        if (
+          outbound == null ||
+          inbound == null ||
+          !Number.isFinite(outbound) ||
+          !Number.isFinite(inbound)
+        ) {
+          throw new Error("Réponse AR sans ventilation ida/vta exploitable.");
+        }
+        return {
+          outboundBase: outbound,
+          inboundBase: inbound,
+          segmentVentilationReliable: true,
+        };
+      }
+      return {
+        outboundBase: bundle,
+        inboundBase: 0,
+        segmentVentilationReliable: false,
+      };
+    },
+    []
+  );
+
   useEffect(() => {
     const currentFlow = getBookingFlow();
     setFlowState(currentFlow);
@@ -499,7 +626,7 @@ export default function HebergementPage() {
   }, [catalogOffers]);
 
   useEffect(() => {
-    if (!flow?.outbound.selectedDeparture) return;
+    if (!flow?.outbound.selectedDeparture || flow.tripType === "round_trip") return;
 
     const dep = flow.outbound.selectedDeparture;
     const base = flow.outbound.transportBaseService ?? {
@@ -511,6 +638,7 @@ export default function HebergementPage() {
     setOutboundBaseLoaded(false);
     setOutboundPriceError("");
     setRepricing(true);
+    setRtSegmentVentilationReliable(true);
 
     void (async () => {
       try {
@@ -550,34 +678,63 @@ export default function HebergementPage() {
       return;
     }
 
-    const dep = flow.inbound.selectedDeparture;
-    const base = flow.inbound.transportBaseService ?? {
-      codigoServicioVenta: dep.codigoServicioVenta,
-      tipoServicioVenta: dep.tipoServicioVenta,
-    };
-
     let cancelled = false;
+    setOutboundBaseLoaded(false);
     setInboundBaseLoaded(false);
+    setOutboundPriceError("");
     setInboundPriceError("");
     setRepricing(true);
 
+    const selectedRtPricing = flow.totals.selectedRoundTripPricing;
+    const selectedOutboundDep = flow.outbound.selectedDeparture;
+    const selectedInboundDep = flow.inbound.selectedDeparture;
+    if (
+      selectedRtPricing &&
+      selectedOutboundDep &&
+      selectedInboundDep &&
+      selectedRtPricing.totalEuros > 0 &&
+      selectedRtPricing.outboundSegment.origen === selectedOutboundDep.origen &&
+      selectedRtPricing.outboundSegment.destino === selectedOutboundDep.destino &&
+      selectedRtPricing.outboundSegment.fechaSalida === selectedOutboundDep.fechaSalida &&
+      selectedRtPricing.outboundSegment.horaSalida === selectedOutboundDep.horaSalida &&
+      selectedRtPricing.inboundSegment.origen === selectedInboundDep.origen &&
+      selectedRtPricing.inboundSegment.destino === selectedInboundDep.destino &&
+      selectedRtPricing.inboundSegment.fechaSalida === selectedInboundDep.fechaSalida &&
+      selectedRtPricing.inboundSegment.horaSalida === selectedInboundDep.horaSalida
+    ) {
+      const hasLegSplit =
+        selectedRtPricing.outboundEuros != null &&
+        selectedRtPricing.inboundEuros != null &&
+        Number.isFinite(selectedRtPricing.outboundEuros) &&
+        Number.isFinite(selectedRtPricing.inboundEuros);
+      setRtSegmentVentilationReliable(hasLegSplit);
+      setOutboundBaseNum(
+        hasLegSplit ? selectedRtPricing.outboundEuros! : selectedRtPricing.totalEuros
+      );
+      setInboundBaseNum(hasLegSplit ? selectedRtPricing.inboundEuros! : 0);
+      setOutboundBaseLoaded(true);
+      setInboundBaseLoaded(true);
+      setRepricing(false);
+      return;
+    }
+
     void (async () => {
       try {
-        const total = await fetchPrice(
-          flow,
-          dep,
-          base.codigoServicioVenta,
-          base.tipoServicioVenta,
-          "inbound"
-        );
+        const totals = await fetchRoundTripBaseTotals(flow);
         if (!cancelled) {
-          setInboundBaseNum(total);
+          setRtSegmentVentilationReliable(totals.segmentVentilationReliable);
+          setOutboundBaseNum(totals.outboundBase);
+          setInboundBaseNum(totals.inboundBase);
+          setOutboundBaseLoaded(true);
           setInboundBaseLoaded(true);
         }
       } catch (e) {
         if (!cancelled) {
+          setOutboundPriceError(
+            e instanceof Error ? e.message : "Erreur de prix AR."
+          );
           setInboundPriceError(
-            e instanceof Error ? e.message : "Erreur de prix de base retour."
+            e instanceof Error ? e.message : "Erreur de prix AR."
           );
         }
       } finally {
@@ -588,7 +745,7 @@ export default function HebergementPage() {
     return () => {
       cancelled = true;
     };
-  }, [flow, fetchPrice]);
+  }, [flow, fetchRoundTripBaseTotals]);
 
   const hasAnimals = useMemo(() => {
     if (!flow) return false;
@@ -838,12 +995,24 @@ export default function HebergementPage() {
   );
 
   const finalTotal = useMemo(() => {
+    if (flow?.tripType === "round_trip" && !rtSegmentVentilationReliable) {
+      const obSup = Math.max(0, outboundSegmentNum - outboundBaseNum);
+      const inSup = Math.max(0, inboundSegmentNum - inboundBaseNum);
+      return outboundBaseNum + obSup + inSup;
+    }
     let t = outboundSegmentNum;
     if (flow?.tripType === "round_trip") {
       t += inboundSegmentNum;
     }
     return t;
-  }, [flow, outboundSegmentNum, inboundSegmentNum]);
+  }, [
+    flow?.tripType,
+    rtSegmentVentilationReliable,
+    outboundSegmentNum,
+    inboundSegmentNum,
+    outboundBaseNum,
+    inboundBaseNum,
+  ]);
 
   const canContinue = useMemo(() => {
     if (!flow) return false;
@@ -989,6 +1158,27 @@ export default function HebergementPage() {
       };
     }
 
+    const transportPricingCanonical: BookingTransportPricingCanonical =
+      flow.tripType === "round_trip"
+        ? {
+            pricingMode: rtSegmentVentilationReliable
+              ? "round_trip_per_leg"
+              : "round_trip_bundle",
+            totalBundleEuros: rtSegmentVentilationReliable
+              ? outboundBaseNum + inboundBaseNum
+              : outboundBaseNum,
+            outboundEuros: rtSegmentVentilationReliable ? outboundBaseNum : null,
+            inboundEuros: rtSegmentVentilationReliable ? inboundBaseNum : null,
+            segmentVentilationReliable: rtSegmentVentilationReliable,
+          }
+        : {
+            pricingMode: "one_way",
+            totalBundleEuros: outboundBaseNum,
+            outboundEuros: outboundBaseNum,
+            inboundEuros: null,
+            segmentVentilationReliable: true,
+          };
+
     const nextFlow: BookingFlow = {
       ...flow,
       outbound: {
@@ -999,9 +1189,19 @@ export default function HebergementPage() {
       inbound: inboundPatch,
       totals: {
         ...flow.totals,
-        transportOutbound: formatMoney(outboundBaseNum),
+        transportPricingCanonical,
+        transportOutbound:
+          flow.tripType === "round_trip"
+            ? rtSegmentVentilationReliable
+              ? formatMoney(outboundBaseNum)
+              : ""
+            : formatMoney(outboundBaseNum),
         transportInbound:
-          flow.tripType === "round_trip" ? formatMoney(inboundBaseNum) : "",
+          flow.tripType === "round_trip"
+            ? rtSegmentVentilationReliable
+              ? formatMoney(inboundBaseNum)
+              : ""
+            : "",
         accommodationOutbound: formatMoney(outboundSupplementNum),
         accommodationInbound:
           flow.tripType === "round_trip"

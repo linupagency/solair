@@ -231,6 +231,18 @@ function PaiementSuccesContent() {
           );
         }
 
+        const draftTotalNum = Number(String(draftPayload.total || "").trim());
+        const capturedAmountNum = Number(String(captureJson.amount || "").trim());
+        if (
+          Number.isFinite(draftTotalNum) &&
+          Number.isFinite(capturedAmountNum) &&
+          Math.abs(draftTotalNum - capturedAmountNum) > 0.01
+        ) {
+          throw new Error(
+            `Montant capturé PayPal (${capturedAmountNum.toFixed(2)}) différent du montant autoritaire du draft (${draftTotalNum.toFixed(2)}).`
+          );
+        }
+
         setStep("Création de la réservation transporteur...");
 
         const bookingResponse = await fetch(
@@ -242,6 +254,7 @@ function PaiementSuccesContent() {
             },
             body: JSON.stringify({
               draftId,
+              capturedAmount: captureJson.amount || "",
             }),
           }
         );

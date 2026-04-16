@@ -62,6 +62,15 @@ function firstTotalInPrecioBlock(
 /** Mode de lecture des blocs WSDL `PrecioEntidad` par ligne. */
 export type ArmasTarificacionLegMode = "combined" | "ida_leg" | "vta_leg";
 
+export function resolveArmasTarificacionLegMode(
+  tripType: "one_way" | "round_trip" | undefined,
+  armasLeg: "outbound" | "inbound" | undefined
+): ArmasTarificacionLegMode {
+  if (tripType === "round_trip" && armasLeg === "outbound") return "ida_leg";
+  if (tripType === "round_trip" && armasLeg === "inbound") return "vta_leg";
+  return "combined";
+}
+
 function pickLinePrecioTotalForLegMode(
   line: Record<string, unknown>,
   mode: ArmasTarificacionLegMode
@@ -200,6 +209,60 @@ export function sumPrecioTotalFromNasaTarificacionesResult(
   return any ? sum : null;
 }
 
+/** Tolérance pour décider si `precioIdaEntidad` + `precioVtaEntidad` ventilent le même total que la ligne « combinée ». */
+const ARMAS_RT_IDA_VTA_COHERENCE_EPS = 0.02;
+
+/**
+ * Aller-retour en un seul `nasaTarificaciones` : le WSDL expose `precioEntidad`,
+ * `precioIdaEntidad` et `precioVtaEntidad` comme blocs distincts sans garantie
+ * que ida+vta soit la somme du forfait (ex. forfait dans `precioEntidad` uniquement,
+ * ou reliquats ida/vta non additifs).
+ *
+ * - `bundleTotalEuros` : somme des montants lus en mode `combined` (priorité `precioEntidad`, WSDL).
+ * - `segmentVentilationReliable` : true seulement si ida+vta === bundle (on peut afficher aller/retour séparément).
+ */
+export type ArmasRoundTripPriceBreakdown = {
+  bundleTotalEuros: number | null;
+  idaSubtotalEuros: number | null;
+  vtaSubtotalEuros: number | null;
+  segmentVentilationReliable: boolean;
+};
+
+export function resolveArmasRoundTripPriceBreakdown(
+  soapResult: unknown
+): ArmasRoundTripPriceBreakdown {
+  const bundleTotalEuros = sumPrecioTotalFromNasaTarificacionesResult(
+    soapResult,
+    "combined"
+  );
+  const idaSubtotalEuros = sumPrecioTotalFromNasaTarificacionesResult(
+    soapResult,
+    "ida_leg"
+  );
+  const vtaSubtotalEuros = sumPrecioTotalFromNasaTarificacionesResult(
+    soapResult,
+    "vta_leg"
+  );
+
+  let segmentVentilationReliable = false;
+  if (
+    bundleTotalEuros !== null &&
+    idaSubtotalEuros !== null &&
+    vtaSubtotalEuros !== null
+  ) {
+    const sumLegs = idaSubtotalEuros + vtaSubtotalEuros;
+    segmentVentilationReliable =
+      Math.abs(sumLegs - bundleTotalEuros) <= ARMAS_RT_IDA_VTA_COHERENCE_EPS;
+  }
+
+  return {
+    bundleTotalEuros,
+    idaSubtotalEuros,
+    vtaSubtotalEuros,
+    segmentVentilationReliable,
+  };
+}
+
 /**
  * Nœud métier NASA sous `return` (parfois `return.return` selon le client SOAP).
  */
@@ -254,4 +317,93 @@ export function normalizeNasaTarificacionesLines(
       raw: line,
     };
   });
+}
+
+/** Présence d’un montant exploitable (`total` WSDL ou clés de repli) par bloc prix, par ligne. */
+export function describeTarificacionPrecioBlocksPresence(soapResult: unknown): {
+  lineCount: number;
+  lines: Array<{
+    hasPrecioEntidadTotal: boolean;
+    hasPrecioIdaTotal: boolean;
+    hasPrecioVtaTotal: boolean;
+  }>;
+} {
+  const rawLines = getTarificacionRawLinesFromSoapResult(soapResult);
+  return {
+    lineCount: rawLines.length,
+    lines: rawLines.map((line) => {
+      const L = line as Record<string, unknown>;
+      const pe = L.precioEntidad as Record<string, unknown> | undefined;
+      const pi = L.precioIdaEntidad as Record<string, unknown> | undefined;
+      const pv = L.precioVtaEntidad as Record<string, unknown> | undefined;
+      return {
+        hasPrecioEntidadTotal: firstTotalInPrecioBlock(pe) !== undefined,
+        hasPrecioIdaTotal: firstTotalInPrecioBlock(pi) !== undefined,
+        hasPrecioVtaTotal: firstTotalInPrecioBlock(pv) !== undefined,
+      };
+    }),
+  };
+}
+
+export type TarificacionAmountCandidate = {
+  lineIndex: number;
+  path: string;
+  rawValue: string | number;
+  parsedValue: number | null;
+};
+
+function candidateKeyLooksLikeAmount(key: string): boolean {
+  const k = key.toLowerCase();
+  return (
+    k.includes("importe") ||
+    k.includes("total") ||
+    k.includes("precio") ||
+    k.includes("impuesto") ||
+    k.includes("tasa") ||
+    k.includes("recargo") ||
+    k.includes("ttc")
+  );
+}
+
+function walkAmountCandidates(
+  value: unknown,
+  path: string,
+  out: TarificacionAmountCandidate[],
+  lineIndex: number
+) {
+  if (value == null) return;
+  if (Array.isArray(value)) {
+    value.forEach((v, idx) =>
+      walkAmountCandidates(v, `${path}[${idx}]`, out, lineIndex)
+    );
+    return;
+  }
+  if (typeof value !== "object") return;
+  const obj = value as Record<string, unknown>;
+  for (const [key, child] of Object.entries(obj)) {
+    const childPath = path ? `${path}.${key}` : key;
+    if (
+      candidateKeyLooksLikeAmount(key) &&
+      (typeof child === "string" || typeof child === "number")
+    ) {
+      out.push({
+        lineIndex,
+        path: childPath,
+        rawValue: child,
+        parsedValue: parsePrecioTotalValue(child),
+      });
+    }
+    walkAmountCandidates(child, childPath, out, lineIndex);
+  }
+}
+
+export function extractTarificacionAmountCandidates(
+  soapResult: unknown
+): TarificacionAmountCandidate[] {
+  const rawLines = getTarificacionRawLinesFromSoapResult(soapResult);
+  const out: TarificacionAmountCandidate[] = [];
+  rawLines.forEach((line, lineIndex) => {
+    walkAmountCandidates(line, `tarificacionEntidad[${lineIndex}]`, out, lineIndex);
+  });
+  return out;
 }

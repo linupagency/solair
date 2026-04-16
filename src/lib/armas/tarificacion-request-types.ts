@@ -31,7 +31,46 @@ export type TarificacionRequestBody = {
     tipoServicioVenta: string;
     cantidad?: number;
   };
+  /** Segment retour explicite pour une demande AR `nasaTarificaciones` en une seule requête. */
+  returnSegment?: {
+    origen: string;
+    destino: string;
+    fechaSalida: string;
+    horaSalida: string;
+    codigoServicioVenta: string;
+    tipoServicioVenta: string;
+    sentidoSalida?: number;
+  };
   rawTrailerLength?: boolean;
   pricingSoapTrace?: boolean;
   pricingTrace?: boolean;
+  /**
+   * Métadonnée UI uniquement : ne part pas dans le SOAP `nasaTarificaciones`.
+   * Sert aux logs serveur quand `SOLAIR_ARMAS_RT_PRICING_DEBUG=1`.
+   */
+  pricingRtDebug?: {
+    requestId?: string;
+    tripType?: "one_way" | "round_trip";
+    armasLeg?: "outbound" | "inbound";
+    selectedOutboundSegment?: {
+      origen: string;
+      destino: string;
+      fechaSalida: string;
+      horaSalida: string;
+      barco?: string;
+      serviceCode?: string;
+      serviceType?: string;
+      segmentKey?: string;
+    };
+    selectedInboundSegment?: {
+      origen: string;
+      destino: string;
+      fechaSalida: string;
+      horaSalida: string;
+      barco?: string;
+      serviceCode?: string;
+      serviceType?: string;
+      segmentKey?: string;
+    };
+  };
 };

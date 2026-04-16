@@ -522,6 +522,7 @@ function buildReservationPaxsVehsEntidad(
 }
 
 export type NasaTarificacionesRequestParams = {
+  requestId?: string;
   origen: string;
   destino: string;
   fechaSalida: string;
@@ -544,6 +545,19 @@ export type NasaTarificacionesRequestParams = {
     cantidad?: number;
   };
   /**
+   * Segment retour explicite : si présent, le SOAP envoie 2 `salidaEntidad`
+   * (aller + retour) pour une vraie tarification AR.
+   */
+  returnSegment?: {
+    origen: string;
+    destino: string;
+    fechaSalida: string;
+    horaSalida: string;
+    codigoServicioVenta: string;
+    tipoServicioVenta: string;
+    sentidoSalida?: number;
+  };
+  /**
    * Remorque : `true` → `raw` (largo = longueur totale, sans metrosExtra). `false` ou omis →
    * `split` (largo base palier + metrosExtra). Ignoré si la catégorie n’est pas `*_trailer`.
    */
@@ -555,7 +569,7 @@ export type NasaTarificacionesRequestParams = {
 /** Arguments exacts passés à `nasaTarificacionesAsync` (hors client SOAP). */
 export function buildNasaTarificacionesSoapArgs(
   params: NasaTarificacionesRequestParams
-) {
+): Record<string, unknown> {
   const passengerPlan = buildPricingPassengerPlan({
     passengerTipos: params.passengerTipos,
     cantidad: params.cantidad,
@@ -596,13 +610,62 @@ export function buildNasaTarificacionesSoapArgs(
         ]
       : primaryServicio;
 
+  const returnServicioVentaEntidad =
+    params.returnSegment &&
+    companion &&
+    companion.codigoServicioVenta?.trim() &&
+    companion.tipoServicioVenta?.trim()
+      ? [
+          {
+            cantidad: passengerPlan.cantidadServicioVenta,
+            codigoServicioVenta: params.returnSegment.codigoServicioVenta.trim(),
+            tipoServicioVenta: params.returnSegment.tipoServicioVenta.trim(),
+          },
+          {
+            cantidad: companion.cantidad ?? 1,
+            codigoServicioVenta: companion.codigoServicioVenta.trim(),
+            tipoServicioVenta: companion.tipoServicioVenta.trim(),
+          },
+        ]
+      : params.returnSegment
+        ? {
+          cantidad: passengerPlan.cantidadServicioVenta,
+          codigoServicioVenta: params.returnSegment.codigoServicioVenta.trim(),
+          tipoServicioVenta: params.returnSegment.tipoServicioVenta.trim(),
+        }
+        : undefined;
+
   /** Ne pas forcer `raw` ici : `buildVehicleEntity` applique le défaut remorque (split). */
   const trailerMode = trailerVehiculoEntidadModeFromFlag(params.rawTrailerLength);
 
-  return {
-    contextoEntidad: buildArmasContext(),
-    salidasEntidad: {
-      salidaEntidad: {
+  const salidaEntidad = params.returnSegment
+    ? [
+        {
+          fechaSalida: params.fechaSalida,
+          horaSalida: params.horaSalida,
+          sentidoSalida: params.sentidoSalida ?? 1,
+          serviciosVentasEntidad: {
+            servicioVentaEntidad,
+          },
+          trayectoEntidad: {
+            puertoDestinoEntidad: { codigoPuerto: params.destino },
+            puertoOrigenEntidad: { codigoPuerto: params.origen },
+          },
+        },
+        {
+          fechaSalida: params.returnSegment.fechaSalida,
+          horaSalida: params.returnSegment.horaSalida,
+          sentidoSalida: params.returnSegment.sentidoSalida ?? 2,
+          serviciosVentasEntidad: {
+            servicioVentaEntidad: returnServicioVentaEntidad,
+          },
+          trayectoEntidad: {
+            puertoDestinoEntidad: { codigoPuerto: params.returnSegment.destino },
+            puertoOrigenEntidad: { codigoPuerto: params.returnSegment.origen },
+          },
+        },
+      ]
+    : {
         fechaSalida: params.fechaSalida,
         horaSalida: params.horaSalida,
         sentidoSalida: params.sentidoSalida ?? 1,
@@ -613,7 +676,12 @@ export function buildNasaTarificacionesSoapArgs(
           puertoDestinoEntidad: { codigoPuerto: params.destino },
           puertoOrigenEntidad: { codigoPuerto: params.origen },
         },
-      },
+      };
+
+  return {
+    contextoEntidad: buildArmasContext(),
+    salidasEntidad: {
+      salidaEntidad: salidaEntidad as unknown,
     },
     paxsVehsEntidad: buildPricingPaxsVehsEntidad({
       tiposPasajero: passengerPlan.tiposPasajero,
@@ -673,9 +741,48 @@ export async function nasaTarificacionesRequest(
 ) {
   const client = await createArmasSoapClient();
   const args = buildNasaTarificacionesSoapArgs(params);
+  const salidaRaw = (args?.salidasEntidad as { salidaEntidad?: unknown } | undefined)
+    ?.salidaEntidad;
+  const salidaList = Array.isArray(salidaRaw)
+    ? salidaRaw
+    : salidaRaw != null
+      ? [salidaRaw]
+      : [];
 
   if (shouldLogNasaTarificacionesPricing(params)) {
     const veh = extractPricingVehiculoEntidad(args);
+    console.error(
+      "[SOLAIR_ARMAS_RT_PRICING_DEBUG] wsdl.salidaEntidad.sent",
+      JSON.stringify(salidaList, null, 2)
+    );
+    console.error(
+      "[SOLAIR_ARMAS_RT_PRICING_DEBUG] wsdl.salidaEntidad.summary",
+      JSON.stringify(
+        {
+          requestId: params.requestId ?? null,
+          salidas: salidaList.map((s) => {
+          const row = s as {
+            sentidoSalida?: unknown;
+            fechaSalida?: unknown;
+            horaSalida?: unknown;
+            trayectoEntidad?: {
+              puertoOrigenEntidad?: { codigoPuerto?: unknown };
+              puertoDestinoEntidad?: { codigoPuerto?: unknown };
+            };
+          };
+          return {
+            sentidoSalida: row.sentidoSalida ?? null,
+            origen: row.trayectoEntidad?.puertoOrigenEntidad?.codigoPuerto ?? null,
+            destino: row.trayectoEntidad?.puertoDestinoEntidad?.codigoPuerto ?? null,
+            fechaSalida: row.fechaSalida ?? null,
+            horaSalida: row.horaSalida ?? null,
+          };
+          }),
+        },
+        null,
+        2
+      )
+    );
     console.error(
       "[SOLAIR_ARMAS_PRICING_DEBUG] soapArgs=",
       JSON.stringify(args, null, 2)
@@ -851,6 +958,19 @@ export async function nasaReservasRequest(params: {
     vehicleCategory?: string;
     vehicleData?: ReservationVehicleInput["vehicleData"];
   }>;
+  /**
+   * Segment retour explicite : si présent, le SOAP envoie 2 `salidaEntidad`
+   * (aller + retour) dans le même dossier de réservation.
+   */
+  returnSegment?: {
+    origen: string;
+    destino: string;
+    fechaSalida: string;
+    horaSalida: string;
+    codigoServicioVenta: string;
+    tipoServicioVenta: string;
+    sentidoSalida?: number;
+  };
 }) {
   const client = await createArmasSoapClient();
 
@@ -881,10 +1001,46 @@ export async function nasaReservasRequest(params: {
       },
     })) ?? [];
 
-  const args = {
-    contextoEntidad: buildArmasContext(),
-    salidasEntidad: {
-      salidaEntidad: {
+  const salidaEntidad = params.returnSegment
+    ? [
+        {
+          fechaSalida: params.fechaSalida,
+          horaSalida: params.horaSalida,
+          sentidoSalida: params.sentidoSalida ?? 1,
+          serviciosVentasEntidad: {
+            servicioVentaEntidad: {
+              cantidad: params.cantidad,
+              codigoServicioVenta: params.codigoServicioVenta,
+              tipoServicioVenta: params.tipoServicioVenta,
+            },
+          },
+          trayectoEntidad: {
+            puertoDestinoEntidad: { codigoPuerto: params.destino },
+            puertoOrigenEntidad: { codigoPuerto: params.origen },
+          },
+        },
+        {
+          fechaSalida: params.returnSegment.fechaSalida,
+          horaSalida: params.returnSegment.horaSalida,
+          sentidoSalida: params.returnSegment.sentidoSalida ?? 2,
+          serviciosVentasEntidad: {
+            servicioVentaEntidad: {
+              cantidad: params.cantidad,
+              codigoServicioVenta: params.returnSegment.codigoServicioVenta,
+              tipoServicioVenta: params.returnSegment.tipoServicioVenta,
+            },
+          },
+          trayectoEntidad: {
+            puertoDestinoEntidad: {
+              codigoPuerto: params.returnSegment.destino,
+            },
+            puertoOrigenEntidad: {
+              codigoPuerto: params.returnSegment.origen,
+            },
+          },
+        },
+      ]
+    : {
         fechaSalida: params.fechaSalida,
         horaSalida: params.horaSalida,
         sentidoSalida: params.sentidoSalida ?? 1,
@@ -899,7 +1055,12 @@ export async function nasaReservasRequest(params: {
           puertoDestinoEntidad: { codigoPuerto: params.destino },
           puertoOrigenEntidad: { codigoPuerto: params.origen },
         },
-      },
+      };
+
+  const args = {
+    contextoEntidad: buildArmasContext(),
+    salidasEntidad: {
+      salidaEntidad: salidaEntidad as unknown,
     },
     paxsVehsEntidad: buildReservationPaxsVehsEntidad(passengers, {
       animalsCount: params.animalsCount,
@@ -927,6 +1088,32 @@ export async function nasaReservasRequest(params: {
   };
 
   const [result] = await client.nasaReservasAsync(args);
+  return result;
+}
+
+export async function nasaPagosRequest(params: {
+  codigoLocata: string;
+  importe: number;
+  codigoFormaPago?: string;
+}) {
+  const client = await createArmasSoapClient();
+  const args = {
+    contextoEntidad: buildArmasContext(),
+    pagosEntidad: {
+      pagoEntidad: {
+        formasPagosEntidad: {
+          formaPagoEntidad: {
+            codigoFormaPago: params.codigoFormaPago || "CRE",
+            importe: params.importe,
+          },
+        },
+        locataEntidad: {
+          codigoLocata: params.codigoLocata,
+        },
+      },
+    },
+  };
+  const [result] = await client.nasaPagosAsync(args);
   return result;
 }
 

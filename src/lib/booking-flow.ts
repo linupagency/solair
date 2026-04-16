@@ -112,12 +112,36 @@ export type BookingContact = {
   telefono: string;
 };
 
+/**
+ * Prix transport figé après l’étape résultats (ou hébergement) — préférer ce bloc aux chaînes `transportOutbound` / `transportInbound` pour la logique métier.
+ */
+export type BookingTransportPricingCanonical = {
+  pricingMode: "one_way" | "round_trip_bundle" | "round_trip_per_leg";
+  totalBundleEuros: number;
+  outboundEuros: number | null;
+  inboundEuros: number | null;
+  segmentVentilationReliable: boolean;
+};
+
+export type BookingRoundTripSelectedPricing = {
+  outboundSegment: BookingSelectedDeparture;
+  inboundSegment: BookingSelectedDeparture;
+  outboundEuros: number | null;
+  inboundEuros: number | null;
+  totalEuros: number;
+  serviceCode: string;
+  serviceType: string;
+  rawPricingResponse?: unknown;
+};
+
 export type BookingTotals = {
   transportOutbound?: string;
   transportInbound?: string;
   accommodationOutbound?: string;
   accommodationInbound?: string;
   finalTotal?: string;
+  transportPricingCanonical?: BookingTransportPricingCanonical;
+  selectedRoundTripPricing?: BookingRoundTripSelectedPricing;
 };
 
 export type BookingSearch = {

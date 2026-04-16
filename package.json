@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "verify:rt-pricing": "node --experimental-strip-types scripts/verify-rt-pricing.mts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

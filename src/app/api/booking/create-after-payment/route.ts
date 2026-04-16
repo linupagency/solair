@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { validateArmasBasicConfig } from "@/lib/armas/config";
-import { nasaReservasRequest } from "@/lib/armas/client";
+import { nasaPagosRequest, nasaReservasRequest } from "@/lib/armas/client";
+import { isArmasRtPricingDebugEnabled } from "@/lib/armas/rt-pricing-debug";
 import {
   getBookingDraft,
   markBookingDraftReserved,
@@ -11,6 +12,7 @@ import { sendBookingConfirmationEmail } from "@/lib/email";
 
 type CreateAfterPaymentBody = {
   draftId: string;
+  capturedAmount?: string;
 };
 
 type ReservationResponse = {
@@ -41,6 +43,34 @@ type ReservationResponse = {
   };
 };
 
+type PagoResponse = {
+  return?: {
+    codigo?: string;
+    texto?: string;
+    pagosEntidad?: {
+      pagoEntidad?:
+        | {
+            formasPagosEntidad?: {
+              formaPagoEntidad?: {
+                importe?: string | number;
+                codigoFormaPago?: string;
+              };
+            };
+            locataEntidad?: { codigoLocata?: string };
+          }
+        | Array<{
+            formasPagosEntidad?: {
+              formaPagoEntidad?: {
+                importe?: string | number;
+                codigoFormaPago?: string;
+              };
+            };
+            locataEntidad?: { codigoLocata?: string };
+          }>;
+    };
+  };
+};
+
 function normalizeString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
@@ -53,6 +83,21 @@ function getFirstReservation(result: ReservationResponse) {
   const raw = result?.return?.reservasEntidad?.reservaEntidad;
   if (!raw) return null;
   return Array.isArray(raw) ? raw[0] || null : raw;
+}
+
+function getFirstPago(result: PagoResponse) {
+  const raw = result?.return?.pagosEntidad?.pagoEntidad;
+  if (!raw) return null;
+  return Array.isArray(raw) ? raw[0] || null : raw;
+}
+
+function toNumberOrNull(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim()) {
+    const n = Number(value.replace(",", "."));
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
 }
 
 function normalizeTraveler(traveler: BookingDraftTraveler) {
@@ -211,6 +256,24 @@ export async function POST(request: NextRequest) {
 
     const vehicleAssignments = buildVehicleAssignments();
 
+    if (payload.tripType === "round_trip") {
+      const outTarifa = normalizeString(payload.codigoTarifa);
+      const inTarifa = normalizeString(payload.inboundCodigoTarifa);
+      if (inTarifa && outTarifa && inTarifa !== outTarifa) {
+        return NextResponse.json(
+          {
+            ok: false,
+            message:
+              "Dossier AR non réservable en mode unifié: tarifs aller/retour différents alors que `nasaReservas` ne porte qu’une `tarifaEntidad`.",
+            outboundTarifa: outTarifa,
+            inboundTarifa: inTarifa,
+            draftId,
+          },
+          { status: 409 }
+        );
+      }
+    }
+
     async function bookOneLeg(args: {
       origen: string;
       destino: string;
@@ -220,6 +283,49 @@ export async function POST(request: NextRequest) {
       tipoServicioVenta: string;
       codigoTarifa: string;
     }) {
+      const returnSegment =
+        payload.tripType === "round_trip" && payload.inboundSelectedDeparture
+          ? {
+              origen: payload.inboundSelectedDeparture.origen,
+              destino: payload.inboundSelectedDeparture.destino,
+              fechaSalida: payload.inboundSelectedDeparture.fechaSalida,
+              horaSalida: payload.inboundSelectedDeparture.horaSalida,
+              codigoServicioVenta:
+                payload.inboundSelectedDeparture.codigoServicioVenta,
+              tipoServicioVenta:
+                payload.inboundSelectedDeparture.tipoServicioVenta,
+              // Verrou WSDL AR: la traversée retour est toujours en sentidoSalida=2.
+              sentidoSalida: 2,
+            }
+          : undefined;
+      if (isArmasRtPricingDebugEnabled()) {
+        console.info(
+          "[AR_SENTIDO_CHECK] booking.createAfterPayment.mapping",
+          JSON.stringify(
+            {
+              tripType: payload.tripType,
+              outboundSentidoSalida: 1,
+              inboundSentidoSalida: returnSegment?.sentidoSalida ?? null,
+              outbound: {
+                origen: args.origen,
+                destino: args.destino,
+                fechaSalida: args.fechaSalida,
+                horaSalida: args.horaSalida,
+              },
+              inbound: returnSegment
+                ? {
+                    origen: returnSegment.origen,
+                    destino: returnSegment.destino,
+                    fechaSalida: returnSegment.fechaSalida,
+                    horaSalida: returnSegment.horaSalida,
+                  }
+                : null,
+            },
+            null,
+            0
+          )
+        );
+      }
       return (await nasaReservasRequest({
         origen: args.origen,
         destino: args.destino,
@@ -255,6 +361,7 @@ export async function POST(request: NextRequest) {
             }
           : undefined,
         vehicleAssignments,
+        returnSegment,
       })) as ReservationResponse;
     }
 
@@ -306,65 +413,97 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    let inboundCodigoLocata = "";
-    let inboundResult: ReservationResponse | null = null;
-
-    if (
-      payload.tripType === "round_trip" &&
-      payload.inboundSelectedDeparture
-    ) {
-      const inb = payload.inboundSelectedDeparture;
-      inboundResult = await bookOneLeg({
-        origen: inb.origen,
-        destino: inb.destino,
-        fechaSalida: inb.fechaSalida,
-        horaSalida: inb.horaSalida,
-        codigoServicioVenta: inb.codigoServicioVenta,
-        tipoServicioVenta: inb.tipoServicioVenta,
-        codigoTarifa: normalizeString(payload.inboundCodigoTarifa),
-      });
-
-      const inbBiz = normalizeString(inboundResult?.return?.codigo);
-      if (!isBusinessSuccess(inbBiz)) {
+    const outboundReservationTotal = toNumberOrNull(
+      outboundReservation?.precioEntidad?.total
+    );
+    const totalFromReservations = outboundReservationTotal;
+    if (totalFromReservations === null || totalFromReservations <= 0) {
+      return NextResponse.json(
+        {
+          ok: false,
+          message:
+            "Réservation créée, mais montant réservation Armas indisponible pour finaliser le paiement.",
+          draftId,
+          codigoLocata,
+          data: outboundResult,
+        },
+        { status: 502 }
+      );
+    }
+    if (body.capturedAmount != null && body.capturedAmount.trim()) {
+      const captured = toNumberOrNull(body.capturedAmount);
+      if (captured === null) {
+        return NextResponse.json(
+          {
+            ok: false,
+            message: "Montant capturé PayPal invalide.",
+          },
+          { status: 400 }
+        );
+      }
+      if (Math.abs(captured - totalFromReservations) > 0.01) {
         return NextResponse.json(
           {
             ok: false,
             message:
-              "Aller réservé, mais la réservation retour a échoué. Contactez l’agence avec la référence aller.",
-            outboundCodigoLocata: codigoLocata,
-            businessCode: inbBiz || null,
-            businessText: normalizeString(inboundResult?.return?.texto) || null,
+              "Montant capturé PayPal différent du montant réservation Armas.",
+            capturedAmount: captured.toFixed(2),
+            armasReservationAmount: totalFromReservations.toFixed(2),
             draftId,
-            data: inboundResult,
+            codigoLocata,
           },
           { status: 409 }
         );
       }
+    }
 
-      const inbRes = getFirstReservation(inboundResult);
-      inboundCodigoLocata = normalizeString(
-        inbRes?.locataEntidad?.codigoLocata
+    const paymentResult = (await nasaPagosRequest({
+      codigoLocata,
+      importe: totalFromReservations,
+      codigoFormaPago: "CRE",
+    })) as PagoResponse;
+    const paymentCode = normalizeString(paymentResult?.return?.codigo);
+    const paymentText = normalizeString(paymentResult?.return?.texto);
+    if (!isBusinessSuccess(paymentCode)) {
+      return NextResponse.json(
+        {
+          ok: false,
+          message:
+            "Réservation créée mais finalisation nasaPagos non confirmée.",
+          draftId,
+          codigoLocata,
+          businessCode: paymentCode || null,
+          businessText: paymentText || null,
+          data: { reservation: outboundResult, payment: paymentResult },
+        },
+        { status: 409 }
       );
+    }
 
-      if (!inboundCodigoLocata) {
-        return NextResponse.json(
-          {
-            ok: false,
-            message:
-              "Aller réservé, mais référence retour introuvable. Contactez l’agence.",
-            outboundCodigoLocata: codigoLocata,
-            draftId,
-            data: inboundResult,
-          },
-          { status: 502 }
-        );
-      }
+    const paid = getFirstPago(paymentResult);
+    const pagoImporte = toNumberOrNull(
+      paid?.formasPagosEntidad?.formaPagoEntidad?.importe
+    );
+    if (pagoImporte === null || Math.abs(pagoImporte - totalFromReservations) > 0.01) {
+      return NextResponse.json(
+        {
+          ok: false,
+          message:
+            "nasaPagos confirmé, mais le montant renvoyé n’est pas réconciliable avec la réservation.",
+          draftId,
+          codigoLocata,
+          paymentAmount: pagoImporte,
+          reservationAmount: totalFromReservations,
+          data: { reservation: outboundResult, payment: paymentResult },
+        },
+        { status: 409 }
+      );
     }
 
     const total = String(
-      payload.total ||
-        outboundReservation?.precioEntidad?.total ||
-        ""
+      totalFromReservations !== null
+        ? totalFromReservations.toFixed(2)
+        : payload.total || ""
     );
     const fechaValidezReserva = normalizeString(
       outboundReservation?.fechaValidezReserva
@@ -372,10 +511,9 @@ export async function POST(request: NextRequest) {
 
     const updatedDraft = await markBookingDraftReserved(draftId, {
       codigoLocata,
-      inboundCodigoLocata: inboundCodigoLocata || undefined,
       total,
       fechaValidezReserva,
-      businessCode: outboundCode,
+      businessCode: paymentCode || outboundCode,
     });
 
     let emailSent = false;
@@ -399,9 +537,9 @@ export async function POST(request: NextRequest) {
             ];
 
       const inboundLeg =
-        inboundCodigoLocata && payload.inboundSelectedDeparture
+        payload.tripType === "round_trip" && payload.inboundSelectedDeparture
           ? {
-              codigoLocata: inboundCodigoLocata,
+              codigoLocata,
               origen: payload.inboundSelectedDeparture.origen,
               destino: payload.inboundSelectedDeparture.destino,
               fechaSalida: payload.inboundSelectedDeparture.fechaSalida,
@@ -447,14 +585,13 @@ export async function POST(request: NextRequest) {
       businessText: outboundText || null,
       reservation: updatedDraft?.reservation || {
         codigoLocata,
-        inboundCodigoLocata: inboundCodigoLocata || undefined,
         total,
         fechaValidezReserva,
-        businessCode: outboundCode,
+        businessCode: paymentCode || outboundCode,
       },
       emailSent,
       emailError,
-      data: { outbound: outboundResult, inbound: inboundResult },
+      data: { reservation: outboundResult, payment: paymentResult },
     });
   } catch (error) {
     const message =

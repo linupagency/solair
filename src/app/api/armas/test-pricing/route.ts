@@ -7,7 +7,14 @@ import {
   nasaTarificacionesRequest,
   trailerVehiculoEntidadModeFromFlag,
 } from "@/lib/armas/client";
-import { normalizeNasaTarificacionesLines } from "@/lib/armas/tarificacion-normalize";
+import {
+  describeTarificacionPrecioBlocksPresence,
+  extractTarificacionAmountCandidates,
+  normalizeNasaTarificacionesLines,
+  resolveArmasTarificacionLegMode,
+  sumPrecioBlocksFromNasaTarificacionesResult,
+  sumPrecioTotalFromNasaTarificacionesResult,
+} from "@/lib/armas/tarificacion-normalize";
 import type { TarificacionRequestBody } from "@/lib/armas/tarificacion-request-types";
 import { prepareNasaPricingCall } from "@/lib/armas/prepare-nasa-pricing-call";
 import { buildPricingSoapTraceEcho } from "@/lib/armas/pricing-soap-trace-echo";
@@ -43,6 +50,71 @@ function coerceRawTrailerLength(v: unknown): boolean | undefined {
   }
   if (typeof v === "string") return parseQueryFlag(v);
   return undefined;
+}
+
+function segmentMatches(
+  expected:
+    | {
+        origen: string;
+        destino: string;
+        fechaSalida: string;
+        horaSalida: string;
+      }
+    | undefined,
+  actual: {
+    origen: string;
+    destino: string;
+    fechaSalida: string;
+    horaSalida: string;
+  }
+) {
+  if (!expected) return true;
+  return (
+    normalizeString(expected.origen) === actual.origen &&
+    normalizeString(expected.destino) === actual.destino &&
+    normalizeString(expected.fechaSalida) === actual.fechaSalida &&
+    normalizeString(expected.horaSalida) === actual.horaSalida
+  );
+}
+
+function buildSegmentKey(input: {
+  origen: string;
+  destino: string;
+  fechaSalida: string;
+  horaSalida: string;
+  barco?: string;
+  serviceCode?: string;
+  serviceType?: string;
+}) {
+  const n = (v: unknown) => normalizeString(String(v ?? "")).toUpperCase();
+  return [
+    n(input.origen),
+    n(input.destino),
+    n(input.fechaSalida),
+    n(input.horaSalida),
+    n(input.barco),
+    n(input.serviceCode),
+    n(input.serviceType),
+  ].join("|");
+}
+
+function resolveDisplayedAmountChosenPath(
+  candidates: Array<{ path: string; parsedValue: number | null }>,
+  chosen: number | null,
+  legMode: "combined" | "ida_leg" | "vta_leg"
+) {
+  if (chosen == null) return null;
+  const close = (a: number, b: number) => Math.abs(a - b) <= 0.03;
+  const exact = candidates.filter(
+    (c) => c.parsedValue != null && close(c.parsedValue, chosen)
+  );
+  const byMode =
+    legMode === "ida_leg"
+      ? exact.find((c) => c.path.includes("precioIdaEntidad"))
+      : legMode === "vta_leg"
+        ? exact.find((c) => c.path.includes("precioVtaEntidad"))
+        : exact.find((c) => c.path.includes("precioEntidad"));
+  return byMode?.path ?? exact[0]?.path ?? null;
 }
 
 function parsePassengerTipos(raw: string | null | undefined): string[] | undefined {
@@ -137,6 +209,8 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const pricingRtDebug = body.pricingRtDebug;
+
   const postBody: TarificacionRequestBody = {
     origen,
     destino,
@@ -155,12 +229,208 @@ export async function POST(request: NextRequest) {
     vehiclePassengerIndex: body.vehiclePassengerIndex,
     vehicleData: body.vehicleData,
     companionServicioVenta: body.companionServicioVenta,
+    returnSegment: body.returnSegment,
     rawTrailerLength: coerceRawTrailerLength(body.rawTrailerLength),
     pricingSoapTrace: pricingSoapTraceFromPostBody(body) ? true : undefined,
   };
 
+  const selectedOutboundSegment = pricingRtDebug?.selectedOutboundSegment;
+  const selectedInboundSegment = pricingRtDebug?.selectedInboundSegment;
+  if (pricingRtDebug?.armasLeg === "inbound") {
+    const actualInbound = {
+      origen: postBody.origen,
+      destino: postBody.destino,
+      fechaSalida: postBody.fechaSalida,
+      horaSalida: postBody.horaSalida,
+    };
+    const actualInboundSegmentKey = buildSegmentKey({
+      ...actualInbound,
+      serviceCode: postBody.codigoServicioVenta,
+      serviceType: postBody.tipoServicioVenta,
+    });
+    if (
+      !segmentMatches(selectedInboundSegment, actualInbound) ||
+      (normalizeString(selectedInboundSegment?.serviceCode) &&
+        normalizeString(selectedInboundSegment?.serviceCode) !==
+          postBody.codigoServicioVenta) ||
+      (normalizeString(selectedInboundSegment?.serviceType) &&
+        normalizeString(selectedInboundSegment?.serviceType) !==
+          postBody.tipoServicioVenta) ||
+      (normalizeString(selectedInboundSegment?.segmentKey) &&
+        normalizeString(selectedInboundSegment?.segmentKey).toUpperCase() !==
+          actualInboundSegmentKey)
+    ) {
+      return NextResponse.json(
+        {
+          ok: false,
+          message:
+            "Tarification inbound invalide: segment visible client != segment envoyé SOAP.",
+        },
+        { status: 409 }
+      );
+    }
+  }
+  if (pricingRtDebug?.armasLeg === "outbound") {
+    const actualOutbound = {
+      origen: postBody.origen,
+      destino: postBody.destino,
+      fechaSalida: postBody.fechaSalida,
+      horaSalida: postBody.horaSalida,
+    };
+    const actualOutboundSegmentKey = buildSegmentKey({
+      ...actualOutbound,
+      serviceCode: postBody.codigoServicioVenta,
+      serviceType: postBody.tipoServicioVenta,
+    });
+    if (
+      !segmentMatches(selectedOutboundSegment, actualOutbound) ||
+      (normalizeString(selectedOutboundSegment?.serviceCode) &&
+        normalizeString(selectedOutboundSegment?.serviceCode) !==
+          postBody.codigoServicioVenta) ||
+      (normalizeString(selectedOutboundSegment?.serviceType) &&
+        normalizeString(selectedOutboundSegment?.serviceType) !==
+          postBody.tipoServicioVenta) ||
+      (normalizeString(selectedOutboundSegment?.segmentKey) &&
+        normalizeString(selectedOutboundSegment?.segmentKey).toUpperCase() !==
+          actualOutboundSegmentKey)
+    ) {
+      return NextResponse.json(
+        {
+          ok: false,
+          message:
+            "Tarification outbound invalide: segment visible client != segment envoyé SOAP.",
+        },
+        { status: 409 }
+      );
+    }
+  }
+  if (process.env.SOLAIR_ARMAS_RT_PRICING_DEBUG === "1") {
+    const sentSegmentKey = buildSegmentKey({
+      origen: postBody.origen,
+      destino: postBody.destino,
+      fechaSalida: postBody.fechaSalida,
+      horaSalida: postBody.horaSalida,
+      serviceCode: postBody.codigoServicioVenta,
+      serviceType: postBody.tipoServicioVenta,
+    });
+    console.error(
+      "[SOLAIR_ARMAS_RT_PRICING_DEBUG] api/armas/test-pricing.pre-soap.segments",
+      JSON.stringify(
+        {
+          requestId: pricingRtDebug?.requestId ?? null,
+          armasLeg: pricingRtDebug?.armasLeg ?? null,
+          clientVisibleOutboundSegment: selectedOutboundSegment ?? null,
+          clientVisibleInboundSegment: selectedInboundSegment ?? null,
+          soapPrimarySegment: {
+            origen: postBody.origen,
+            destino: postBody.destino,
+            fechaSalida: postBody.fechaSalida,
+            horaSalida: postBody.horaSalida,
+            serviceCode: postBody.codigoServicioVenta,
+            serviceType: postBody.tipoServicioVenta,
+            segmentKey: sentSegmentKey,
+          },
+          soapReturnSegment: postBody.returnSegment
+            ? {
+                ...postBody.returnSegment,
+                segmentKey: buildSegmentKey({
+                  origen: postBody.returnSegment.origen,
+                  destino: postBody.returnSegment.destino,
+                  fechaSalida: postBody.returnSegment.fechaSalida,
+                  horaSalida: postBody.returnSegment.horaSalida,
+                  serviceCode: postBody.returnSegment.codigoServicioVenta,
+                  serviceType: postBody.returnSegment.tipoServicioVenta,
+                }),
+              }
+            : null,
+        },
+        null,
+        0
+      )
+    );
+  }
+
   try {
     const result = await runTarificacion(postBody);
+
+    if (process.env.SOLAIR_ARMAS_RT_PRICING_DEBUG === "1") {
+      const legMode = resolveArmasTarificacionLegMode(
+        pricingRtDebug?.tripType,
+        pricingRtDebug?.armasLeg
+      );
+      const segmentTotal = sumPrecioTotalFromNasaTarificacionesResult(
+        result,
+        legMode
+      );
+      const blockSums = sumPrecioBlocksFromNasaTarificacionesResult(result);
+      const precioPresence = describeTarificacionPrecioBlocksPresence(result);
+      const amountCandidates = extractTarificacionAmountCandidates(result);
+      console.error(
+        "[SOLAIR_ARMAS_RT_PRICING_DEBUG] api/armas/test-pricing POST",
+        JSON.stringify(
+          {
+            tripType: pricingRtDebug?.tripType ?? null,
+            requestId: pricingRtDebug?.requestId ?? null,
+            armasLeg: pricingRtDebug?.armasLeg ?? null,
+            armasTarificacionLegMode: legMode,
+            precioBlocksPresence: precioPresence,
+            blockSums,
+            segmentTotalEurosRetained: segmentTotal,
+            origen,
+            destino,
+            fechaSalida,
+            horaSalida,
+            codigoServicioVenta,
+            tipoServicioVenta,
+            outboundSegment: pricingRtDebug?.selectedOutboundSegment ?? null,
+            inboundSegment: pricingRtDebug?.selectedInboundSegment ?? null,
+            passengers: {
+              cantidad,
+              passengerTipos: body.passengerTipos ?? null,
+              tipoPasajero,
+            },
+            residentBonificationCode: bonificacion,
+            vehicle: {
+              hasVehicle:
+                Boolean(postBody.vehicle && postBody.vehicle !== "none") ||
+                Boolean(
+                  postBody.vehicleCategory && postBody.vehicleCategory !== "none"
+                ),
+              vehicle: postBody.vehicle ?? null,
+              vehicleCategory: postBody.vehicleCategory ?? null,
+              companionServicioVenta: postBody.companionServicioVenta ?? null,
+              vehicleData: postBody.vehicleData ?? null,
+            },
+            selectedService: {
+              serviceCode: codigoServicioVenta,
+              serviceType: tipoServicioVenta,
+            },
+            displayedAmountChosen: segmentTotal,
+            displayedAmountChosenPath: resolveDisplayedAmountChosenPath(
+              amountCandidates,
+              segmentTotal,
+              legMode
+            ),
+            amountCandidates,
+            amountCandidatesAround175: amountCandidates.filter(
+              (c) =>
+                c.parsedValue != null &&
+                c.parsedValue >= 174.5 &&
+                c.parsedValue <= 175.5
+            ),
+            amountCandidatesAround25_95: amountCandidates.filter(
+              (c) =>
+                c.parsedValue != null && Math.abs(c.parsedValue - 25.95) <= 0.03
+            ),
+            amountCandidatesAround30_00: amountCandidates.filter(
+              (c) => c.parsedValue != null && Math.abs(c.parsedValue - 30) <= 0.03
+            ),
+          },
+          null,
+          0
+        )
+      );
+    }
 
     const json: Record<string, unknown> = {
       ok: true,
