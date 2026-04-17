@@ -104,20 +104,32 @@ export function mergeProbeSoapOverrides(
 ): NasaTarificacionesSoapArgs {
   const merged = JSON.parse(JSON.stringify(base)) as NasaTarificacionesSoapArgs;
   if (!overrides) return merged;
+
   if (overrides.serviciosVentasEntidad) {
-    merged.salidasEntidad.salidaEntidad.serviciosVentasEntidad = {
-      servicioVentaEntidad: overrides.serviciosVentasEntidad
-        .servicioVentaEntidad as NasaTarificacionesSoapArgs["salidasEntidad"]["salidaEntidad"]["serviciosVentasEntidad"]["servicioVentaEntidad"],
-    };
+    const salidaEntidadRaw = merged.salidasEntidad?.salidaEntidad;
+    const salidaEntidad = Array.isArray(salidaEntidadRaw)
+      ? salidaEntidadRaw[0]
+      : salidaEntidadRaw;
+
+      if (salidaEntidad) {
+        salidaEntidad.serviciosVentasEntidad = {
+          servicioVentaEntidad:
+            overrides.serviciosVentasEntidad.servicioVentaEntidad as any,
+        };
+      }
   }
+
   if (overrides.paxsVehsEntidad) {
     merged.paxsVehsEntidad = {
       ...merged.paxsVehsEntidad,
-      paxVehEntidad: overrides.paxsVehsEntidad.paxVehEntidad as NasaTarificacionesSoapArgs["paxsVehsEntidad"]["paxVehEntidad"],
+      paxVehEntidad:
+        overrides.paxsVehsEntidad.paxVehEntidad as NasaTarificacionesSoapArgs["paxsVehsEntidad"]["paxVehEntidad"],
     };
   }
+
   return merged;
 }
+  
 
 function normalizeString(v: unknown, field: string): string | { error: string } {
   if (v == null || v === "") return { error: `${field} requis.` };
