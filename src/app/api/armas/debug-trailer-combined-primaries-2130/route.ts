@@ -280,7 +280,7 @@ rows.push({
   total,
   tariffError: tariffError ?? null,
   soapArgs,
-  serviciosVentasEntidad: salidaEntidad?.serviciosVentasEntidad ?? null,
+  serviciosVentasSoap: salidaEntidad?.serviciosVentasEntidad ?? null,
   vehiculoEntidad,
   tarificacionesNormalized: linesNorm,
 });
