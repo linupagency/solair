@@ -271,7 +271,7 @@ function SectionCard({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_10px_28px_rgba(15,23,42,0.05)] sm:p-6">
+    <section className="solair-panel p-5 sm:p-6">
       <div className="mb-5">
         <h2 className="text-xl font-bold text-slate-900">{title}</h2>
         {subtitle ? (
@@ -733,22 +733,22 @@ function VehiculePageContent() {
 
   return (
     <main className="min-h-screen bg-[#F7F5F2] text-slate-900">
-      <section className="bg-[#163B6D] pb-8 pt-5">
-        <div className="mx-auto max-w-7xl px-4">
-          <div className="mb-5 flex flex-wrap items-center gap-2">
-            <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-[#163B6D]">
+      <section className="solair-hero pb-8 pt-5">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6">
+          <div className="solair-stepbar mb-5">
+            <span className="solair-stepchip solair-stepchip--done">
               1. Recherche
             </span>
-            <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-[#163B6D]">
+            <span className="solair-stepchip solair-stepchip--done">
               2. Traversées et prix
             </span>
-            <span className="rounded-full bg-[#F28C28] px-3 py-1 text-xs font-semibold text-white">
+            <span className="solair-stepchip solair-stepchip--active">
               3. Véhicule
             </span>
-            <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-semibold text-white">
+            <span className="solair-stepchip solair-stepchip--pending">
               4. Passager
             </span>
-            <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-semibold text-white">
+            <span className="solair-stepchip solair-stepchip--pending">
               5. Récapitulatif
             </span>
           </div>
@@ -772,7 +772,7 @@ function VehiculePageContent() {
             <button
               type="button"
               onClick={() => router.back()}
-              className="rounded-2xl border border-white/20 bg-white/10 px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/20"
+              className="solair-secondary-btn px-4 py-3 text-sm font-semibold"
             >
               Retour
             </button>

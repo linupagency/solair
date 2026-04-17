@@ -1,33 +1,18 @@
 /**
- * Ajustement optionnel des montants issus de `nasaTarificaciones` pour les aligner
- * sur les totaux « grand public » (ex. API JSON armastrasmediterranea.com).
+ * Alignement strict sur les montants fournis par Armas.
  *
- * Le WSDL `PrecioEntidad` ne précise pas si `total` est net ou TTC. Sur des cas réels
- * observés (passager + véhicule, AR), les totaux publics coïncident avec
- * `PrecioEntidad.total × 1,21` (TVA ES 21 %). À valider sur votre environnement
- * (`nasaReservas`, `nasaPagos`, montant PayPal) avant activation en production.
+ * Les fichiers techniques fournis par Armas (`WSDL` + document d'interface) sont
+ * la source de vérité pour le tunnel Solair. Toute surcouche de conversion
+ * implicite sur les montants SOAP rend l'affichage ambigu, en particulier sur les
+ * forfaits aller-retour.
+ *
+ * Ce module conserve donc une API stable, mais n'applique plus aucune majoration :
+ * les montants consommés par l'application sont ceux lus dans la réponse Armas,
+ * arrondis à 2 décimales uniquement pour stabiliser les calculs UI.
  */
 
-function parsePositiveFiniteNumber(raw: string): number | null {
-  const s = raw.trim();
-  if (!s) return null;
-  const n = Number(s.replace(",", "."));
-  return Number.isFinite(n) && n > 0 ? n : null;
-}
-
-/**
- * Multiplicateur appliqué aux montants euros renvoyés par `fetchTransportPricing`.
- * Exemple site public TTC depuis SOAP HT : `1.21`.
- * Désactivé si absent ou invalide (comportement = 1).
- */
 export function getConsumerTtcMultiplier(): number {
-  if (typeof process === "undefined") return 1;
-  const raw =
-    process.env.NEXT_PUBLIC_SOLAIR_ARMAS_CONSUMER_TTC_MULTIPLIER ||
-    process.env.SOLAIR_ARMAS_CONSUMER_TTC_MULTIPLIER ||
-    "";
-  const m = parsePositiveFiniteNumber(raw);
-  return m ?? 1;
+  return 1;
 }
 
 export function roundMoneyEuros(value: number): number {
@@ -36,7 +21,5 @@ export function roundMoneyEuros(value: number): number {
 
 export function applyConsumerTtcToEuros(value: number | null): number | null {
   if (value == null || !Number.isFinite(value)) return value;
-  const m = getConsumerTtcMultiplier();
-  if (m === 1) return roundMoneyEuros(value);
-  return roundMoneyEuros(value * m);
+  return roundMoneyEuros(value);
 }

@@ -21,7 +21,7 @@ import {
   type BookingTransportServiceRef,
 } from "@/lib/booking-flow";
 import {
-  combinedServiceLabel,
+  getCommercialDescription,
   getCommercialKind,
   getCommercialLabel,
 } from "@/lib/ui/armas-commercial";
@@ -36,8 +36,48 @@ type JourneyDirection = "outbound" | "inbound";
 type CatalogService = {
   codigoServicioVenta?: string;
   tipoServicioVenta?: string;
+  disponibles?: number;
   textoCorto?: string;
   textoLargo?: string;
+};
+
+type DepartureService = CatalogService & {
+  disponibilidad?: boolean;
+};
+
+type DepartureSalida = {
+  fechaSalida?: string;
+  horaSalida?: string;
+  trayectoEntidad?: {
+    puertoOrigenEntidad?: {
+      codigoPuerto?: string;
+    };
+    puertoDestinoEntidad?: {
+      codigoPuerto?: string;
+    };
+  };
+  serviciosVentasEntidad?: {
+    servicioVentaEntidad?: DepartureService[] | DepartureService;
+  };
+};
+
+type DeparturesApiResponse = {
+  ok: boolean;
+  message?: string;
+  error?: string;
+  data?: {
+    return?: {
+      salidasEntidad?: {
+        salidaEntidad?: DepartureSalida[] | DepartureSalida;
+      };
+    };
+  };
+};
+
+type PricingServiceLine = {
+  cantidad: number;
+  codigoServicioVenta: string;
+  tipoServicioVenta: string;
 };
 
 type SaleServicesApiResponse = {
@@ -58,14 +98,21 @@ function normalizeArray<T>(value?: T[] | T): T[] {
   return Array.isArray(value) ? value : [value];
 }
 
-function offerKey(o: Pick<BookingSalidaServiceOffer, "codigoServicioVenta" | "tipoServicioVenta">) {
-  return `${o.codigoServicioVenta}|${o.tipoServicioVenta}`;
+function normalizeServiceCode(value?: string) {
+  return String(value || "").trim().toUpperCase();
 }
 
-const BASE_PASSENGER_TRANSPORT_CODES = new Set(["BY", "BP", "P", "Q"]);
+function offerKey(
+  o: Pick<BookingSalidaServiceOffer, "codigoServicioVenta" | "tipoServicioVenta">
+) {
+  return `${normalizeServiceCode(o.codigoServicioVenta)}|${normalizeServiceCode(
+    o.tipoServicioVenta
+  )}`;
+}
 
 /** Option explicite : formule transport incluse sans supplément confort. */
 const BASE_INCLUDED_KEY = "__SOLAIR_BASE_INCLUDED__";
+const ARMAS_ACCOMMODATION_SUPPLEMENT_FACTOR = 0.9;
 
 /** Libellés (texto corto/largo) à exclure — confort / hébergement uniquement à l’étape 3 */
 const FORBIDDEN_ACCOMMODATION_LABEL_SNIPPETS = [
@@ -92,12 +139,11 @@ function isAccommodationService(
   offer: BookingSalidaServiceOffer,
   selectedTransportServiceKey: string
 ): boolean {
-  const tipo = (offer.tipoServicioVenta || "").trim();
+  const tipo = (offer.tipoServicioVenta || "").trim().toUpperCase();
   const codigo = (offer.codigoServicioVenta || "").trim().toUpperCase();
 
-  if (tipo === "V") return false;
+  if (tipo !== "P") return false;
   if (!codigo || !tipo) return false;
-  if (BASE_PASSENGER_TRANSPORT_CODES.has(codigo)) return false;
 
   const label = combinedOfferLabelUpper(offer);
   for (const frag of FORBIDDEN_ACCOMMODATION_LABEL_SNIPPETS) {
@@ -180,60 +226,43 @@ function deriveInitialAccommodationKey(segment: {
   return BASE_INCLUDED_KEY;
 }
 
-function labelForOffer(o: BookingSalidaServiceOffer) {
-  return getCommercialLabel(o);
+function getAccommodationOfferTitle(offer: BookingSalidaServiceOffer): string {
+  const commercialFallback = String(getCommercialLabel(offer) || "").trim();
+  if (commercialFallback && commercialFallback !== "Option") {
+    return commercialFallback;
+  }
+  const shortLabel = String(offer.textoCorto || "").trim();
+  if (shortLabel) return shortLabel;
+  const longLabel = String(offer.textoLargo || "").trim();
+  if (longLabel) return longLabel;
+  const code = String(offer.codigoServicioVenta || "").trim();
+  const type = String(offer.tipoServicioVenta || "").trim();
+  if (code && type) return `Service ${code} (${type})`;
+  if (code) return `Service ${code}`;
+  return "Service";
 }
 
-/** Libellé affiché uniquement sur cette page (français) — ne pas utiliser pour BookingFlow. */
-function accommodationUiTitleFr(offer: BookingSalidaServiceOffer): string {
-  const raw = combinedServiceLabel(offer).trim();
-  if (!raw) {
-    const kind = getCommercialKind(offer);
-    if (kind === "cabin") return "Cabine";
-    if (kind === "seat") return "Siège";
-    return "Option confort";
+function getAccommodationOfferDescription(
+  offer: BookingSalidaServiceOffer
+): string {
+  const frontDescription = String(getCommercialDescription(offer) || "").trim();
+  if (frontDescription) return frontDescription;
+
+  const kind = getCommercialKind(offer);
+  if (kind === "cabin") {
+    return "Cabine à usage exclusif pour votre traversée.";
   }
-
-  let s = raw;
-  const rules: [RegExp, string][] = [
-    [/ASIENTO\s+LOBBY\s+BAR/gi, "Siège Lobby Bar"],
-    [/CAMAROTE\s+TRIPLE\s+PREFERENTE/gi, "Cabine triple préférentielle"],
-    [/CAMAROTE\s+CUADRUPLE\s+PREFERENTE/gi, "Cabine quadruple préférentielle"],
-    [/CAMAROTE/gi, "Cabine"],
-    [/CABINA/gi, "Cabine"],
-    [/ASIENTO/gi, "Siège"],
-    [/BUTACA/gi, "Fauteuil"],
-    [/POLTRONA/gi, "Fauteuil"],
-    [/PREFERENTES/gi, "préférentielles"],
-    [/PREFERENTE/gi, "préférentielle"],
-    [/COMPLÈTES/gi, "complètes"],
-    [/COMPLÈTE/gi, "complète"],
-    [/COMPLETAS/gi, "complètes"],
-    [/COMPLETA/gi, "complète"],
-    [/DOBLE/gi, "double"],
-    [/CUADRUPLE/gi, "quadruple"],
-    [/TRIPLE/gi, "triple"],
-    [/SIMPLE/gi, "simple"],
-    [/MASCOTAS/gi, "animaux"],
-    [/MASCOTA/gi, "animal"],
-    [/INTERIOR/gi, "intérieure"],
-    [/INTERIEUR/gi, "intérieure"],
-    [/EXTERIOR/gi, "extérieure"],
-    [/EXTERIEUR/gi, "extérieure"],
-    [/VENTANILLO/gi, "hublot"],
-    [/VENTANA/gi, "fenêtre"],
-    [/LUJO/gi, "luxe"],
-    [/\bVIP\b/gi, "VIP"],
-    [/ECONOMIC[OA]?/gi, "économique"],
-    [/TURISTA/gi, "standard"],
-  ];
-
-  for (const [re, rep] of rules) {
-    s = s.replace(re, rep);
+  if (kind === "seat") {
+    return "Option passager proposée sur cette traversée.";
   }
+  return "Service proposé sur cette traversée.";
+}
 
-  s = s.replace(/\s+/g, " ").trim();
-  return s || "Option confort";
+function getAccommodationOfferBadge(offer: BookingSalidaServiceOffer): string {
+  const kind = getCommercialKind(offer);
+  if (kind === "cabin") return "Cabine";
+  if (kind === "seat") return "Fauteuil";
+  return "Option";
 }
 
 function normalizeMoneyToNumber(value?: string | number | null): number {
@@ -257,6 +286,10 @@ function formatMoney(value: number) {
   return `${value.toFixed(2).replace(".", ",")} €`;
 }
 
+function roundMoney(value: number) {
+  return Math.round(value * 100) / 100;
+}
+
 function formatApiDate(value?: string) {
   if (!value || value.length !== 8) return value || "-";
   return `${value.slice(6, 8)}/${value.slice(4, 6)}/${value.slice(0, 4)}`;
@@ -272,9 +305,103 @@ function getDirectionLabel(direction: JourneyDirection, flow: BookingFlow) {
   return direction === "outbound" ? "Aller" : "Retour";
 }
 
+function toArmasAccommodationSupplement(
+  passengerOnlyBaseTotal: number,
+  passengerOnlyOptionTotal: number
+) {
+  const diff = Math.max(0, passengerOnlyOptionTotal - passengerOnlyBaseTotal);
+  return roundMoney(diff * ARMAS_ACCOMMODATION_SUPPLEMENT_FACTOR);
+}
+
 function getTotalPassengers(flow: BookingFlow) {
   const c = flow.search.passengers;
   return c.adults + c.youth + c.seniors + c.children + c.babies;
+}
+
+function getPricedPassengerCount(flow: BookingFlow) {
+  const passengerTipos = expandPassengerTipoList(flow.search.passengers);
+  const nonBabies = passengerTipos.filter((tipo) => tipo !== "B");
+  if (nonBabies.length > 0) return nonBabies.length;
+  return Math.max(1, passengerTipos.length);
+}
+
+function buildPricingServiceLine(
+  cantidad: number,
+  ref: BookingTransportServiceRef
+): PricingServiceLine | null {
+  const normalizedCantidad = Math.floor(cantidad);
+  const codigoServicioVenta = String(ref.codigoServicioVenta || "").trim();
+  const tipoServicioVenta = String(ref.tipoServicioVenta || "").trim();
+  if (normalizedCantidad <= 0 || !codigoServicioVenta || !tipoServicioVenta) {
+    return null;
+  }
+  return {
+    cantidad: normalizedCantidad,
+    codigoServicioVenta,
+    tipoServicioVenta,
+  };
+}
+
+function buildAccommodationServiceLines(
+  flow: BookingFlow,
+  baseServiceRef: BookingTransportServiceRef,
+  offer: BookingSalidaServiceOffer | undefined,
+  companionServicioVenta:
+    | {
+        codigoServicioVenta: string;
+        tipoServicioVenta: string;
+        cantidad?: number;
+      }
+    | undefined
+): PricingServiceLine[] | undefined {
+  const pricedPassengerCount = getPricedPassengerCount(flow);
+  if (pricedPassengerCount <= 0) return undefined;
+
+  const baseLine = buildPricingServiceLine(pricedPassengerCount, baseServiceRef);
+  if (!offer) {
+    const lines = baseLine ? [baseLine] : [];
+    const companionLine = companionServicioVenta
+      ? buildPricingServiceLine(companionServicioVenta.cantidad ?? 1, {
+          codigoServicioVenta: companionServicioVenta.codigoServicioVenta,
+          tipoServicioVenta: companionServicioVenta.tipoServicioVenta,
+        })
+      : null;
+    if (companionLine) lines.push(companionLine);
+    return lines.length > 0 ? lines : undefined;
+  }
+
+  const rawSlots =
+    typeof offer.disponibles === "number" && Number.isFinite(offer.disponibles)
+      ? Math.floor(offer.disponibles)
+      : pricedPassengerCount;
+  const selectedSlots = Math.max(
+    1,
+    Math.min(pricedPassengerCount, rawSlots > 0 ? rawSlots : pricedPassengerCount)
+  );
+  const remainingBaseSlots = Math.max(0, pricedPassengerCount - selectedSlots);
+
+  const lines: PricingServiceLine[] = [];
+  const remainingBaseLine = buildPricingServiceLine(
+    remainingBaseSlots,
+    baseServiceRef
+  );
+  if (remainingBaseLine) lines.push(remainingBaseLine);
+
+  const selectedOfferLine = buildPricingServiceLine(selectedSlots, {
+    codigoServicioVenta: offer.codigoServicioVenta,
+    tipoServicioVenta: offer.tipoServicioVenta,
+  });
+  if (selectedOfferLine) lines.push(selectedOfferLine);
+
+  const companionLine = companionServicioVenta
+    ? buildPricingServiceLine(companionServicioVenta.cantidad ?? 1, {
+        codigoServicioVenta: companionServicioVenta.codigoServicioVenta,
+        tipoServicioVenta: companionServicioVenta.tipoServicioVenta,
+      })
+    : null;
+  if (companionLine) lines.push(companionLine);
+
+  return lines.length > 0 ? lines : undefined;
 }
 
 function companionCatalogForSelectedDeparture(
@@ -310,12 +437,28 @@ function mergeOfferLists(
   primary: BookingSalidaServiceOffer[],
   fallback: BookingSalidaServiceOffer[]
 ): BookingSalidaServiceOffer[] {
-  const map = new Map<string, BookingSalidaServiceOffer>();
-  for (const o of [...primary, ...fallback]) {
-    const k = offerKey(o);
-    if (!map.has(k)) map.set(k, o);
+  if (primary.length === 0) {
+    return [...fallback];
   }
-  return Array.from(map.values());
+
+  const fallbackMap = new Map(
+    fallback.map((offer) => [offerKey(offer), offer] as const)
+  );
+
+  return primary.map((offer) => {
+    const catalogOffer = fallbackMap.get(offerKey(offer));
+    if (!catalogOffer) return offer;
+
+    return {
+      ...offer,
+      disponibles:
+        typeof offer.disponibles === "number"
+          ? offer.disponibles
+          : catalogOffer.disponibles,
+      textoCorto: offer.textoCorto || catalogOffer.textoCorto,
+      textoLargo: offer.textoLargo || catalogOffer.textoLargo,
+    };
+  });
 }
 
 function catalogToOffers(
@@ -327,11 +470,57 @@ function catalogToOffers(
   return raw
     .filter((s) => s.codigoServicioVenta && s.tipoServicioVenta)
     .map((s) => ({
-      codigoServicioVenta: s.codigoServicioVenta || "",
-      tipoServicioVenta: s.tipoServicioVenta || "",
-      textoCorto: s.textoCorto,
-      textoLargo: s.textoLargo,
+      codigoServicioVenta: normalizeServiceCode(s.codigoServicioVenta),
+      tipoServicioVenta: normalizeServiceCode(s.tipoServicioVenta),
+      disponibles:
+        typeof s.disponibles === "number" && Number.isFinite(s.disponibles)
+          ? Math.floor(s.disponibles)
+          : undefined,
+      textoCorto: String(s.textoCorto || "").trim() || undefined,
+      textoLargo: String(s.textoLargo || "").trim() || undefined,
     }));
+}
+
+function salidaToOffers(salida?: DepartureSalida): BookingSalidaServiceOffer[] {
+  const raw = normalizeArray(salida?.serviciosVentasEntidad?.servicioVentaEntidad);
+  return raw
+    .filter(
+      (service) =>
+        service.disponibilidad !== false &&
+        !!service.codigoServicioVenta &&
+        !!service.tipoServicioVenta
+    )
+    .map((service) => ({
+      codigoServicioVenta: normalizeServiceCode(service.codigoServicioVenta),
+      tipoServicioVenta: normalizeServiceCode(service.tipoServicioVenta),
+      disponibles:
+        typeof service.disponibles === "number" &&
+        Number.isFinite(service.disponibles)
+          ? Math.floor(service.disponibles)
+          : undefined,
+      textoCorto: String(service.textoCorto || "").trim() || undefined,
+      textoLargo: String(service.textoLargo || "").trim() || undefined,
+    }));
+}
+
+function findSelectedDepartureOffers(
+  data: DeparturesApiResponse["data"],
+  dep: NonNullable<BookingFlow["outbound"]["selectedDeparture"]>
+): BookingSalidaServiceOffer[] {
+  const salidas = normalizeArray(data?.return?.salidasEntidad?.salidaEntidad);
+  const matched = salidas.find((salida) => {
+    const origen =
+      salida.trayectoEntidad?.puertoOrigenEntidad?.codigoPuerto || "";
+    const destino =
+      salida.trayectoEntidad?.puertoDestinoEntidad?.codigoPuerto || "";
+    return (
+      salida.fechaSalida === dep.fechaSalida &&
+      salida.horaSalida === dep.horaSalida &&
+      origen === dep.origen &&
+      destino === dep.destino
+    );
+  });
+  return salidaToOffers(matched);
 }
 
 function SectionCard({
@@ -344,7 +533,7 @@ function SectionCard({
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_10px_28px_rgba(15,23,42,0.05)] sm:p-6">
+    <section className="solair-panel p-5 sm:p-6">
       <div className="mb-5">
         <h2 className="text-xl font-bold text-slate-900">{title}</h2>
         {subtitle ? (
@@ -400,11 +589,78 @@ export default function HebergementPage() {
       dep: NonNullable<BookingFlow["outbound"]["selectedDeparture"]>,
       codigoServicioVenta: string,
       tipoServicioVenta: string,
-      armasLeg: "outbound" | "inbound"
+      armasLeg: "outbound" | "inbound",
+      options?: {
+        baseServiceRef?: BookingTransportServiceRef;
+        accommodationOffer?: BookingSalidaServiceOffer;
+      }
     ): Promise<number> => {
       const passengerCount = getTotalPassengers(currentFlow);
       const tipos = expandPassengerTipoList(currentFlow.search.passengers);
       const catalog = companionCatalogForSelectedDeparture(currentFlow, dep);
+      const baseServiceRef = options?.baseServiceRef ?? {
+        codigoServicioVenta,
+        tipoServicioVenta,
+      };
+      const built = tryBuildTarificacionPostBodyFromFlow(
+        currentFlow,
+        {
+          origen: dep.origen,
+          destino: dep.destino,
+          fechaSalida: dep.fechaSalida,
+          horaSalida: dep.horaSalida,
+        },
+        {
+          cantidad: passengerCount,
+          codigoServicioVenta: baseServiceRef.codigoServicioVenta,
+          tipoServicioVenta: baseServiceRef.tipoServicioVenta,
+          tipoPasajero: tipos[0] || "A",
+          passengerTipos: tipos,
+        },
+        catalog
+      );
+      if (!built.ok) {
+        throw new Error(built.error);
+      }
+      const serviceLines = options?.accommodationOffer
+        ? buildAccommodationServiceLines(
+            currentFlow,
+            baseServiceRef,
+            options.accommodationOffer,
+            built.body.companionServicioVenta
+          )
+        : undefined;
+      const priced = await fetchTransportPricing(
+        {
+          ...built.body,
+          ...(serviceLines ? { serviceLines } : {}),
+        },
+        built.normalizedVehicle,
+        currentFlow.tripType === "round_trip"
+          ? { tripType: "round_trip", armasLeg }
+          : undefined
+      );
+      if (!priced.ok) {
+        throw new Error(priced.error);
+      }
+      const n = priced.totalEuros;
+      if (n === null || !Number.isFinite(n)) {
+        throw new Error("Prix non renvoyé par Armas.");
+      }
+      return n;
+    },
+    []
+  );
+
+  const fetchPassengerOnlyPrice = useCallback(
+    async (
+      currentFlow: BookingFlow,
+      dep: NonNullable<BookingFlow["outbound"]["selectedDeparture"]>,
+      codigoServicioVenta: string,
+      tipoServicioVenta: string
+    ): Promise<number> => {
+      const passengerCount = getTotalPassengers(currentFlow);
+      const tipos = expandPassengerTipoList(currentFlow.search.passengers);
       const built = tryBuildTarificacionPostBodyFromFlow(
         currentFlow,
         {
@@ -419,25 +675,29 @@ export default function HebergementPage() {
           tipoServicioVenta,
           tipoPasajero: tipos[0] || "A",
           passengerTipos: tipos,
-        },
-        catalog
+        }
       );
       if (!built.ok) {
         throw new Error(built.error);
       }
+
       const priced = await fetchTransportPricing(
-        built.body,
-        built.normalizedVehicle,
-        currentFlow.tripType === "round_trip"
-          ? { tripType: "round_trip", armasLeg }
-          : undefined
+        {
+          ...built.body,
+          vehicle: "none",
+          vehicleCategory: undefined,
+          vehiclePassengerIndex: undefined,
+          vehicleData: undefined,
+          companionServicioVenta: undefined,
+        },
+        null
       );
       if (!priced.ok) {
         throw new Error(priced.error);
       }
       const n = priced.totalEuros;
       if (n === null || !Number.isFinite(n)) {
-        throw new Error("Prix non renvoyé par Armas.");
+        throw new Error("Prix passager seul non renvoyé par Armas.");
       }
       return n;
     },
@@ -609,12 +869,45 @@ export default function HebergementPage() {
       }
     }
 
+    async function loadDepartureOffers(
+      dep: NonNullable<BookingFlow["outbound"]["selectedDeparture"]>
+    ) {
+      try {
+        const r = await fetch(
+          `/api/armas/test-departures?origen=${encodeURIComponent(
+            dep.origen
+          )}&destino=${encodeURIComponent(dep.destino)}&fecha=${encodeURIComponent(
+            dep.fechaSalida
+          )}`,
+          { cache: "no-store" }
+        );
+        const json: DeparturesApiResponse = await r.json();
+        if (r.ok && json.ok) {
+          return findSelectedDepartureOffers(json.data, dep);
+        }
+      } catch {
+        /* fallback sur le flow persistant */
+      }
+      return [];
+    }
+
     const obFromSeg = currentFlow.outbound.availableServices || [];
     const inFromSeg = currentFlow.inbound?.availableServices || [];
 
-    void loadCatalog().finally(() => {
-      setOutboundOffers(obFromSeg);
-      setInboundOffers(inFromSeg);
+    void Promise.all([
+      loadCatalog(),
+      loadDepartureOffers(obDep),
+      currentFlow.tripType === "round_trip" &&
+      currentFlow.inbound?.selectedDeparture
+        ? loadDepartureOffers(currentFlow.inbound.selectedDeparture)
+        : Promise.resolve([] as BookingSalidaServiceOffer[]),
+    ]).then(([, outboundFreshOffers, inboundFreshOffers]) => {
+      setOutboundOffers(
+        outboundFreshOffers.length > 0 ? outboundFreshOffers : obFromSeg
+      );
+      setInboundOffers(
+        inboundFreshOffers.length > 0 ? inboundFreshOffers : inFromSeg
+      );
       setLoading(false);
     });
   }, []);
@@ -821,23 +1114,36 @@ export default function HebergementPage() {
 
     let cancelled = false;
     setRepricing(true);
+    const outboundBaseRef = flow.outbound.transportBaseService ?? {
+      codigoServicioVenta: flow.outbound.selectedDeparture.codigoServicioVenta,
+      tipoServicioVenta: flow.outbound.selectedDeparture.tipoServicioVenta,
+    };
 
     void (async () => {
       const nextTotals: Record<string, number> = {};
       try {
+        const outboundPassengerOnlyBase = await fetchPassengerOnlyPrice(
+          flow,
+          flow.outbound.selectedDeparture!,
+          outboundBaseRef.codigoServicioVenta,
+          outboundBaseRef.tipoServicioVenta
+        );
         await Promise.all(
           outboundOptions.map(async (offer) => {
             const key = offerKey(offer);
             try {
-              const n = await fetchPrice(
+              const passengerOnlyOption = await fetchPassengerOnlyPrice(
                 flow,
                 flow.outbound.selectedDeparture!,
                 offer.codigoServicioVenta,
-                offer.tipoServicioVenta,
-                "outbound"
+                offer.tipoServicioVenta
               );
-              if (Number.isFinite(n) && n > 0) {
-                nextTotals[key] = n;
+              const supplement = toArmasAccommodationSupplement(
+                outboundPassengerOnlyBase,
+                passengerOnlyOption
+              );
+              if (Number.isFinite(supplement) && supplement >= 0) {
+                nextTotals[key] = roundMoney(outboundBaseNum + supplement);
               }
             } catch {
               // on conserve les autres tarifs valides
@@ -859,7 +1165,8 @@ export default function HebergementPage() {
     flow,
     outboundBaseLoaded,
     outboundOptions,
-    fetchPrice,
+    fetchPassengerOnlyPrice,
+    outboundBaseNum,
   ]);
 
   useEffect(() => {
@@ -879,23 +1186,36 @@ export default function HebergementPage() {
 
     let cancelled = false;
     setRepricing(true);
+    const inboundBaseRef = flow.inbound.transportBaseService ?? {
+      codigoServicioVenta: flow.inbound.selectedDeparture.codigoServicioVenta,
+      tipoServicioVenta: flow.inbound.selectedDeparture.tipoServicioVenta,
+    };
 
     void (async () => {
       const nextTotals: Record<string, number> = {};
       try {
+        const inboundPassengerOnlyBase = await fetchPassengerOnlyPrice(
+          flow,
+          flow.inbound!.selectedDeparture!,
+          inboundBaseRef.codigoServicioVenta,
+          inboundBaseRef.tipoServicioVenta
+        );
         await Promise.all(
           inboundOptions.map(async (offer) => {
             const key = offerKey(offer);
             try {
-              const n = await fetchPrice(
+              const passengerOnlyOption = await fetchPassengerOnlyPrice(
                 flow,
                 flow.inbound!.selectedDeparture!,
                 offer.codigoServicioVenta,
-                offer.tipoServicioVenta,
-                "inbound"
+                offer.tipoServicioVenta
               );
-              if (Number.isFinite(n) && n > 0) {
-                nextTotals[key] = n;
+              const supplement = toArmasAccommodationSupplement(
+                inboundPassengerOnlyBase,
+                passengerOnlyOption
+              );
+              if (Number.isFinite(supplement) && supplement >= 0) {
+                nextTotals[key] = roundMoney(inboundBaseNum + supplement);
               }
             } catch {
               // on conserve les autres tarifs valides
@@ -917,7 +1237,8 @@ export default function HebergementPage() {
     flow,
     inboundBaseLoaded,
     inboundOptions,
-    fetchPrice,
+    fetchPassengerOnlyPrice,
+    inboundBaseNum,
   ]);
 
   useEffect(() => {
@@ -1041,9 +1362,11 @@ export default function HebergementPage() {
   function buildAccommodationBase(): BookingAccommodationSelection {
     return {
       code: "base_included",
-      label: "Formule transport incluse (sans supplément confort)",
+      label: "Sans supplément hébergement",
       price: formatMoney(0),
       isBaseIncluded: true,
+      details:
+        "Vous conservez le transport de base déjà sélectionné, sans option d’hébergement supplémentaire.",
     };
   }
 
@@ -1054,11 +1377,10 @@ export default function HebergementPage() {
   ): BookingAccommodationSelection {
     return {
       code: key,
-      label: labelForOffer(offer),
+      label: getAccommodationOfferTitle(offer),
       price: formatMoney(supplementNum),
       isBaseIncluded: false,
-      details:
-        "Supplément confort / hébergement par rapport au tarif transport de base.",
+      details: getAccommodationOfferDescription(offer),
       codigoServicioVenta: offer.codigoServicioVenta,
       tipoServicioVenta: offer.tipoServicioVenta,
     };
@@ -1284,19 +1606,24 @@ export default function HebergementPage() {
                 >
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-stretch sm:justify-between sm:gap-5">
                     <div className="min-w-0 flex-1">
-                      <div className="text-base font-bold leading-snug">
-                        {accommodationUiTitleFr(offer)}
+                      <div
+                        className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] ${
+                          isSelected
+                            ? "bg-white/15 text-white"
+                            : "bg-slate-100 text-slate-600"
+                        }`}
+                      >
+                        {getAccommodationOfferBadge(offer)}
+                      </div>
+                      <div className="mt-2 text-base font-bold leading-snug">
+                        {getAccommodationOfferTitle(offer)}
                       </div>
                       <div
                         className={`mt-1 text-sm leading-relaxed ${
                           isSelected ? "text-white/85" : "text-slate-500"
                         }`}
                       >
-                        {title === "Cabines"
-                          ? "Plus d’intimité et de confort à bord."
-                          : title === "Fauteuils"
-                            ? "Siège confortable pour la traversée."
-                            : "Confort complémentaire."}
+                        {getAccommodationOfferDescription(offer)}
                       </div>
                       <div
                         className={`mt-2 text-xs font-medium ${
@@ -1356,7 +1683,7 @@ export default function HebergementPage() {
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0 flex-1">
               <div className="text-base font-bold">
-                Transport : formule incluse (sans supplément confort)
+                Sans supplément hébergement
               </div>
               <div
                 className={`mt-1 text-sm ${
@@ -1365,7 +1692,7 @@ export default function HebergementPage() {
                     : "text-slate-500"
                 }`}
               >
-                Tarif transport de base déjà choisi à l&apos;étape 2.
+                Vous conservez uniquement le transport déjà choisi, sans siège premium ni cabine supplémentaire.
               </div>
               {baseNum > 0 ? (
                 <div
@@ -1416,19 +1743,19 @@ export default function HebergementPage() {
           <div className="space-y-6">
             {renderGroup(
               "Fauteuils",
-              "Options assises et premium.",
+              "Places assises disponibles et sièges premium.",
               seats,
               "bg-[#EEF4FB] text-[#163B6D]"
             )}
             {renderGroup(
               "Cabines",
-              "Confort privatif à bord.",
+              "Cabines privatives disponibles sur cette traversée.",
               cabins,
               "bg-[#FFF7EE] text-[#B45309]"
             )}
             {renderGroup(
               "Conforts",
-              "Autres options compatibles.",
+              "Autres services compatibles avec votre traversée.",
               others,
               "bg-slate-100 text-slate-700"
             )}
@@ -1464,22 +1791,22 @@ export default function HebergementPage() {
 
   return (
     <main className="min-h-screen bg-[#F7F5F2] text-slate-900">
-      <section className="bg-[#163B6D] pb-8 pt-5">
-        <div className="mx-auto max-w-7xl px-4">
-          <div className="mb-5 flex flex-wrap items-center gap-2">
-            <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-[#163B6D]">
+      <section className="solair-hero pb-8 pt-5">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6">
+          <div className="solair-stepbar mb-5">
+            <span className="solair-stepchip solair-stepchip--done">
               1. Recherche
             </span>
-            <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-[#163B6D]">
+            <span className="solair-stepchip solair-stepchip--done">
               2. Traversées et prix
             </span>
-            <span className="rounded-full bg-[#F28C28] px-3 py-1 text-xs font-semibold text-white">
+            <span className="solair-stepchip solair-stepchip--active">
               3. Hébergement
             </span>
-            <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-semibold text-white">
+            <span className="solair-stepchip solair-stepchip--pending">
               4. Passager
             </span>
-            <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-semibold text-white">
+            <span className="solair-stepchip solair-stepchip--pending">
               5. Récapitulatif
             </span>
           </div>
@@ -1493,15 +1820,16 @@ export default function HebergementPage() {
                 Hébergement
               </h1>
               <p className="mt-2 text-sm text-white/85">
-                Uniquement les services de confort ou d&apos;hébergement proposés
-                pour votre traversée (hors transport de base et hors véhicule).
+                Choisissez un siège premium ou une cabine uniquement parmi les
+                options réellement proposées pour votre traversée. Le transport
+                de base déjà sélectionné reste inclus.
               </p>
             </div>
 
             <button
               type="button"
               onClick={() => router.back()}
-              className="rounded-2xl border border-white/20 bg-white/10 px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/20"
+              className="solair-secondary-btn px-4 py-3 text-sm font-semibold"
             >
               Retour
             </button>
@@ -1526,7 +1854,7 @@ export default function HebergementPage() {
             <div className="space-y-6">
               <SectionCard
                 title={getDirectionLabel("outbound", flow)}
-                subtitle="Choisissez le service / confort pour l’aller"
+                subtitle="Choisissez le niveau de confort souhaité pour l’aller"
               >
                 <div className="mb-5 grid gap-4 md:grid-cols-3">
                   <div className="rounded-2xl bg-[#F3F6F7] p-4">
@@ -1601,7 +1929,7 @@ export default function HebergementPage() {
               {flow.tripType === "round_trip" && flow.inbound?.selectedDeparture && (
                 <SectionCard
                   title={getDirectionLabel("inbound", flow)}
-                  subtitle="Choisissez le service / confort pour le retour"
+                  subtitle="Choisissez le niveau de confort souhaité pour le retour"
                 >
                   <div className="mb-5 grid gap-4 md:grid-cols-3">
                     <div className="rounded-2xl bg-[#F3F6F7] p-4">

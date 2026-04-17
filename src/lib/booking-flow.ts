@@ -62,6 +62,8 @@ export type BookingTransportServiceRef = {
 export type BookingSalidaServiceOffer = {
   codigoServicioVenta: string;
   tipoServicioVenta: string;
+  /** Nombre d’unités vendables sur cette salida (si communiqué par Armas). */
+  disponibles?: number;
   textoCorto?: string;
   textoLargo?: string;
 };
@@ -150,6 +152,7 @@ export type BookingSearch = {
   fechaIda: string;
   fechaVuelta?: string;
   bonificacion: string;
+  bonificacionLabel?: string;
   passengers: BookingPassengerCounts;
   animals: BookingAnimals;
   vehicles: BookingVehicleSelection[];
@@ -200,6 +203,7 @@ export function createEmptyBookingFlow(): BookingFlow {
       fechaIda: "",
       fechaVuelta: "",
       bonificacion: "G",
+      bonificacionLabel: "Tarif général",
       passengers: { ...DEFAULT_PASSENGER_COUNTS },
       animals: { ...DEFAULT_ANIMALS },
       vehicles: [],

@@ -1,3 +1,9 @@
+export type TarificacionServiceLine = {
+  cantidad: number;
+  codigoServicioVenta: string;
+  tipoServicioVenta: string;
+};
+
 /** Corps JSON attendu par `/api/armas/test-pricing` (POST) — aligné WSDL `nasaTarificaciones`. */
 export type TarificacionRequestBody = {
   origen: string;
@@ -31,6 +37,11 @@ export type TarificacionRequestBody = {
     tipoServicioVenta: string;
     cantidad?: number;
   };
+  /**
+   * Lignes `servicioVentaEntidad` explicites pour la salida aller.
+   * Permet de reproduire un panier mixte (ex. 3 x BY + 1 x BP + XR).
+   */
+  serviceLines?: TarificacionServiceLine[];
   /** Segment retour explicite pour une demande AR `nasaTarificaciones` en une seule requête. */
   returnSegment?: {
     origen: string;
@@ -41,6 +52,8 @@ export type TarificacionRequestBody = {
     tipoServicioVenta: string;
     sentidoSalida?: number;
   };
+  /** Lignes `servicioVentaEntidad` explicites pour la salida retour, si `returnSegment` est utilisé. */
+  returnServiceLines?: TarificacionServiceLine[];
   rawTrailerLength?: boolean;
   pricingSoapTrace?: boolean;
   pricingTrace?: boolean;

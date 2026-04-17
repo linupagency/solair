@@ -1,5 +1,11 @@
 /**
- * Appel unique `/api/armas/test-pricing` + résultat métier structuré (tunnel client).
+ * Appel unique `/api/armas/test-pricing` + résultat métier structuré.
+ *
+ * Implémentation strictement alignée sur les fichiers Armas fournis :
+ * - lecture directe des montants WSDL `precioEntidad` / `precioIdaEntidad` / `precioVtaEntidad`
+ * - aucune majoration HT/TTC implicite côté client
+ * - pour un AR combiné, le total affiché reste le forfait WSDL (`combined`) ;
+ *   la ventilation aller / retour n'est utilisée que si elle est démontrée cohérente
  */
 import type { TarificacionRequestBody } from "@/lib/armas/tarificacion-request-types";
 import {
@@ -13,21 +19,21 @@ import {
   sumPrecioBlocksFromNasaTarificacionesResult,
   sumPrecioTotalFromNasaTarificacionesResult,
 } from "@/lib/armas/tarificacion-normalize";
+import { applyConsumerTtcToEuros } from "@/lib/armas/consumer-ttc-multiplier";
 import { isArmasRtPricingDebugEnabled } from "@/lib/armas/rt-pricing-debug";
-import {
-  applyConsumerTtcToEuros,
-  getConsumerTtcMultiplier,
-} from "@/lib/armas/consumer-ttc-multiplier";
 import type { NormalizedPrimaryVehicle } from "@/lib/vehicle/normalize";
 
-function formatMoneyEuros(n: number): string {
-  return `${n.toFixed(2).replace(".", ",")} €`;
+function formatMoneyEuros(value: number): string {
+  return `${value.toFixed(2).replace(".", ",")} €`;
+}
+
+function closeTo(a: number, b: number, eps = 0.03): boolean {
+  return Math.abs(a - b) <= eps;
 }
 
 export type FetchTransportPricingOptions = {
   requestId?: string;
   tripType?: "one_way" | "round_trip";
-  /** Avec `tripType: round_trip`, sélectionne le bloc WSDL lu par appel (aller vs retour). */
   armasLeg?: "outbound" | "inbound";
   selectedOutboundSegment?: {
     origen: string;
@@ -54,7 +60,6 @@ export type FetchTransportPricingOptions = {
     serviceCode?: string;
     serviceType?: string;
   };
-  /** Segment retour envoyé dans la même requête SOAP pour une vraie tarification AR. */
   returnSegment?: TarificacionRequestBody["returnSegment"];
 };
 
@@ -62,16 +67,11 @@ function firstTarificacionPrecioSnapshot(soapData: unknown): unknown {
   const lines = getTarificacionRawLinesFromSoapResult(soapData);
   const first = lines[0] as Record<string, unknown> | undefined;
   if (!first) return null;
-  const pick = (k: string) => first[k];
   return {
-    precioEntidad: pick("precioEntidad"),
-    precioIdaEntidad: pick("precioIdaEntidad"),
-    precioVtaEntidad: pick("precioVtaEntidad"),
+    precioEntidad: first.precioEntidad,
+    precioIdaEntidad: first.precioIdaEntidad,
+    precioVtaEntidad: first.precioVtaEntidad,
   };
-}
-
-function closeTo(a: number, b: number, eps = 0.03) {
-  return Math.abs(a - b) <= eps;
 }
 
 function resolveDisplayedAmountChosenPath(
@@ -80,15 +80,58 @@ function resolveDisplayedAmountChosenPath(
   legMode: ArmasTarificacionLegMode
 ): string | null {
   const exact = candidates.filter(
-    (c) => c.parsedValue != null && closeTo(c.parsedValue, amount)
+    (candidate) =>
+      candidate.parsedValue != null && closeTo(candidate.parsedValue, amount)
   );
-  const byMode =
-    legMode === "ida_leg"
-      ? exact.find((c) => c.path.includes("precioIdaEntidad"))
-      : legMode === "vta_leg"
-        ? exact.find((c) => c.path.includes("precioVtaEntidad"))
-        : exact.find((c) => c.path.includes("precioEntidad"));
-  return byMode?.path ?? exact[0]?.path ?? null;
+
+  if (legMode === "ida_leg") {
+    return (
+      exact.find((candidate) => candidate.path.includes("precioIdaEntidad"))
+        ?.path ??
+      exact[0]?.path ??
+      null
+    );
+  }
+
+  if (legMode === "vta_leg") {
+    return (
+      exact.find((candidate) => candidate.path.includes("precioVtaEntidad"))
+        ?.path ??
+      exact[0]?.path ??
+      null
+    );
+  }
+
+  return (
+    exact.find((candidate) => candidate.path.includes("precioEntidad"))?.path ??
+    exact[0]?.path ??
+    null
+  );
+}
+
+function buildPricingRtDebugPayload(
+  options?: FetchTransportPricingOptions
+):
+  | {
+      requestId?: string;
+      tripType: "one_way" | "round_trip";
+      armasLeg?: "outbound" | "inbound";
+      selectedOutboundSegment?: FetchTransportPricingOptions["selectedOutboundSegment"];
+      selectedInboundSegment?: FetchTransportPricingOptions["selectedInboundSegment"];
+    }
+  | undefined {
+  if (!options?.tripType) return undefined;
+  return {
+    requestId: options.requestId,
+    tripType: options.tripType,
+    ...(options.armasLeg ? { armasLeg: options.armasLeg } : {}),
+    ...(options.selectedOutboundSegment
+      ? { selectedOutboundSegment: options.selectedOutboundSegment }
+      : {}),
+    ...(options.selectedInboundSegment
+      ? { selectedInboundSegment: options.selectedInboundSegment }
+      : {}),
+  };
 }
 
 export type TransportPricingClientSuccess = {
@@ -98,14 +141,8 @@ export type TransportPricingClientSuccess = {
   outboundEuros?: number | null;
   returnEuros?: number | null;
   roundTripTotalEuros?: number | null;
-  /**
-   * True si les sous-totaux ida/vta (somme des lignes) coïncident avec le total « combined »
-   * (forfait WSDL). Sinon le total à payer / afficher reste `roundTripTotalEuros`, sans ventilation fiable.
-   */
   segmentVentilationReliable?: boolean;
-  /** Mode effectif de lecture des blocs `precioIdaEntidad` / `precioVtaEntidad`. */
   armasTarificacionLegMode: ArmasTarificacionLegMode;
-  /** Sommes des `total` WSDL par bloc (toutes lignes tarifaires). */
   armasIdaSubtotalEuros: number | null;
   armasVtaSubtotalEuros: number | null;
   armasPrecioEntidadSubtotalEuros: number | null;
@@ -121,9 +158,7 @@ export type TransportPricingClientSuccess = {
   } | null;
   normalizedVehicleUsed: NormalizedPrimaryVehicle | null;
   requestBody: TarificacionRequestBody;
-  /** Nœud SOAP brut `data` de `/api/armas/test-pricing` (lignes tarifaires, etc.). */
   soapData: unknown;
-  /** Copie serveur du trace XR (debug). */
   xrPricingTrace?: unknown;
 };
 
@@ -143,7 +178,6 @@ type PricingApiJson = {
   message?: string;
   error?: string;
   data?: unknown;
-  /** Présent si `NEXT_PUBLIC_SOLAIR_XR_PRICING_TRACE=1` et catégorie grande remorque. */
   xrPricingTrace?: unknown;
 };
 
@@ -152,25 +186,9 @@ export async function fetchTransportPricing(
   normalizedVehicleUsed: NormalizedPrimaryVehicle | null,
   options?: FetchTransportPricingOptions
 ): Promise<TransportPricingClientResult> {
-  let response: Response;
-  const pricingRtDebug =
-    options?.tripType && options.armasLeg
-      ? {
-          requestId: options.requestId,
-          tripType: options.tripType,
-          armasLeg: options.armasLeg,
-          selectedOutboundSegment: options.selectedOutboundSegment,
-          selectedInboundSegment: options.selectedInboundSegment,
-        }
-      : options?.tripType
-        ? {
-            requestId: options.requestId,
-            tripType: options.tripType,
-            selectedOutboundSegment: options.selectedOutboundSegment,
-            selectedInboundSegment: options.selectedInboundSegment,
-          }
-        : undefined;
+  const pricingRtDebug = buildPricingRtDebugPayload(options);
 
+  let response: Response;
   try {
     response = await fetch("/api/armas/test-pricing", {
       method: "POST",
@@ -184,10 +202,11 @@ export async function fetchTransportPricing(
       }),
       cache: "no-store",
     });
-  } catch (e) {
+  } catch (error) {
     return {
       ok: false,
-      error: e instanceof Error ? e.message : "Réseau indisponible.",
+      error:
+        error instanceof Error ? error.message : "Réseau indisponible.",
       requestBody: body,
     };
   }
@@ -207,16 +226,14 @@ export async function fetchTransportPricing(
   if (!response.ok || !json.ok) {
     return {
       ok: false,
-      error:
-        json.error ||
-        json.message ||
-        "Tarification indisponible.",
+      error: json.error || json.message || "Tarification indisponible.",
       requestBody: body,
       httpStatus: response.status,
     };
   }
 
-  const retMeta = getNasaTarificacionesReturnNode(json.data);
+  const soapData = json.data;
+  const retMeta = getNasaTarificacionesReturnNode(soapData);
   const armasCodigo =
     retMeta?.codigo != null ? String(retMeta.codigo).trim() : "";
   const armasTexto =
@@ -235,36 +252,48 @@ export async function fetchTransportPricing(
     options?.tripType,
     options?.armasLeg
   );
-  const blockSums = sumPrecioBlocksFromNasaTarificacionesResult(json.data);
-  const precioPresence = describeTarificacionPrecioBlocksPresence(json.data);
-  const idaSegment = sumPrecioTotalFromNasaTarificacionesResult(json.data, "ida_leg");
-  const vtaSegment = sumPrecioTotalFromNasaTarificacionesResult(json.data, "vta_leg");
-  const combinedSegment = sumPrecioTotalFromNasaTarificacionesResult(
-    json.data,
-    "combined"
-  );
   const isRoundTripCombinedSoap =
     options?.tripType === "round_trip" && Boolean(options?.returnSegment);
+
+  const blockSums = sumPrecioBlocksFromNasaTarificacionesResult(soapData);
+  const precioPresence = describeTarificacionPrecioBlocksPresence(soapData);
+  const idaSegment = sumPrecioTotalFromNasaTarificacionesResult(
+    soapData,
+    "ida_leg"
+  );
+  const vtaSegment = sumPrecioTotalFromNasaTarificacionesResult(
+    soapData,
+    "vta_leg"
+  );
+  const combinedSegment = sumPrecioTotalFromNasaTarificacionesResult(
+    soapData,
+    "combined"
+  );
   const rtBreakdown = isRoundTripCombinedSoap
-    ? resolveArmasRoundTripPriceBreakdown(json.data)
+    ? resolveArmasRoundTripPriceBreakdown(soapData)
     : null;
 
-  let sumTotal = sumPrecioTotalFromNasaTarificacionesResult(json.data, legMode);
+  let displayedTotal = sumPrecioTotalFromNasaTarificacionesResult(
+    soapData,
+    legMode
+  );
   let outboundEuros: number | null = idaSegment;
   let returnEuros: number | null = vtaSegment;
   let roundTripTotalEuros: number | null = combinedSegment;
   let segmentVentilationReliable = false;
 
-  if (isRoundTripCombinedSoap && rtBreakdown?.bundleTotalEuros != null) {
-    roundTripTotalEuros = rtBreakdown.bundleTotalEuros;
-    sumTotal = rtBreakdown.bundleTotalEuros;
-    segmentVentilationReliable = rtBreakdown.segmentVentilationReliable;
-    if (rtBreakdown.segmentVentilationReliable) {
-      outboundEuros = rtBreakdown.idaSubtotalEuros;
-      returnEuros = rtBreakdown.vtaSubtotalEuros;
-    } else {
-      outboundEuros = null;
-      returnEuros = null;
+  if (isRoundTripCombinedSoap) {
+    if (rtBreakdown?.bundleTotalEuros != null) {
+      displayedTotal = rtBreakdown.bundleTotalEuros;
+      roundTripTotalEuros = rtBreakdown.bundleTotalEuros;
+      segmentVentilationReliable = rtBreakdown.segmentVentilationReliable;
+      if (segmentVentilationReliable) {
+        outboundEuros = rtBreakdown.idaSubtotalEuros;
+        returnEuros = rtBreakdown.vtaSubtotalEuros;
+      } else {
+        outboundEuros = null;
+        returnEuros = null;
+      }
     }
   } else {
     roundTripTotalEuros =
@@ -275,13 +304,13 @@ export async function fetchTransportPricing(
       idaSegment !== null &&
       vtaSegment !== null &&
       combinedSegment !== null &&
-      Math.abs(idaSegment + vtaSegment - combinedSegment) <= 0.02
+      closeTo(idaSegment + vtaSegment, combinedSegment, 0.02)
     ) {
       segmentVentilationReliable = true;
     }
   }
 
-  if (sumTotal === null) {
+  if (displayedTotal === null) {
     return {
       ok: false,
       error: "Aucun montant total retourné par Armas.",
@@ -290,29 +319,34 @@ export async function fetchTransportPricing(
     };
   }
 
-  const consumerTtcMultiplier = getConsumerTtcMultiplier();
-  const sumTotalSoapNet = sumTotal;
-  sumTotal = applyConsumerTtcToEuros(sumTotal)!;
-  outboundEuros = applyConsumerTtcToEuros(outboundEuros);
-  returnEuros = applyConsumerTtcToEuros(returnEuros);
-  roundTripTotalEuros = applyConsumerTtcToEuros(roundTripTotalEuros);
+  const totalEuros = applyConsumerTtcToEuros(displayedTotal);
   const armasIdaSubtotalEuros = applyConsumerTtcToEuros(blockSums.idaSum);
   const armasVtaSubtotalEuros = applyConsumerTtcToEuros(blockSums.vtaSum);
   const armasPrecioEntidadSubtotalEuros = applyConsumerTtcToEuros(blockSums.peSum);
+  outboundEuros = applyConsumerTtcToEuros(outboundEuros);
+  returnEuros = applyConsumerTtcToEuros(returnEuros);
+  roundTripTotalEuros = applyConsumerTtcToEuros(roundTripTotalEuros);
+
+  if (totalEuros === null) {
+    return {
+      ok: false,
+      error: "Aucun montant total retourné par Armas.",
+      requestBody: body,
+      httpStatus: response.status,
+    };
+  }
 
   if (isArmasRtPricingDebugEnabled()) {
-    const candidates = extractTarificacionAmountCandidates(json.data);
-    const chosenDisplayedAmount = sumTotal;
+    const candidates = extractTarificacionAmountCandidates(soapData);
     const chosenDisplayedAmountPath = resolveDisplayedAmountChosenPath(
       candidates,
-      chosenDisplayedAmount,
+      totalEuros,
       legMode
     );
     const matchesChosen = candidates.filter(
-      (c) => c.parsedValue != null && closeTo(c.parsedValue, chosenDisplayedAmount)
-    );
-    const around175 = candidates.filter(
-      (c) => c.parsedValue != null && c.parsedValue >= 174.5 && c.parsedValue <= 175.5
+      (candidate) =>
+        candidate.parsedValue != null &&
+        closeTo(candidate.parsedValue, totalEuros)
     );
     console.info(
       "[SOLAIR_ARMAS_RT_PRICING_DEBUG] fetchTransportPricing",
@@ -324,16 +358,14 @@ export async function fetchTransportPricing(
           isRoundTripCombinedSoap,
           segmentVentilationReliable,
           rtBreakdown,
-          consumerTtcMultiplier,
-          soapNetEurosRetained: sumTotalSoapNet,
           precioBlocksPresence: precioPresence,
-          firstLinePrecio: firstTarificacionPrecioSnapshot(json.data),
+          firstLinePrecio: firstTarificacionPrecioSnapshot(soapData),
           blockSums,
           idaSegment,
           vtaSegment,
           combinedSegment,
-          segmentTotalEurosRetained: sumTotal,
-          segmentTotalFormatted: formatMoneyEuros(sumTotal),
+          displayedTotalEuros: totalEuros,
+          displayedTotalFormatted: formatMoneyEuros(totalEuros),
           pricingInputContext: {
             requestId: options?.requestId ?? null,
             outboundSegment: options?.selectedOutboundSegment ?? null,
@@ -361,26 +393,12 @@ export async function fetchTransportPricing(
                 options?.debugSelectionContext?.serviceType ??
                 body.tipoServicioVenta,
               accommodationOrServiceLabel:
-                options?.debugSelectionContext?.accommodationOrServiceLabel ?? null,
+                options?.debugSelectionContext?.accommodationOrServiceLabel ??
+                null,
             },
           },
-          displayedAmountChosen: chosenDisplayedAmount,
           displayedAmountChosenPath: chosenDisplayedAmountPath,
-          amountCandidates: candidates,
           amountCandidatesMatchingChosen: matchesChosen,
-          amountCandidatesAround175: around175,
-          amountCandidatesAround25_95: candidates.filter(
-            (c) => c.parsedValue != null && closeTo(c.parsedValue, 25.95)
-          ),
-          amountCandidatesAround30_00: candidates.filter(
-            (c) => c.parsedValue != null && closeTo(c.parsedValue, 30)
-          ),
-          partialAmountHypothesis: {
-            looksLikePartialWhen175Exists:
-              around175.length > 0 && matchesChosen.length > 0
-                ? !closeTo(chosenDisplayedAmount, around175[0].parsedValue ?? 0)
-                : false,
-          },
         },
         null,
         0
@@ -391,8 +409,8 @@ export async function fetchTransportPricing(
   const companion = body.companionServicioVenta;
   return {
     ok: true,
-    totalEuros: sumTotal,
-    totalFormatted: formatMoneyEuros(sumTotal),
+    totalEuros,
+    totalFormatted: formatMoneyEuros(totalEuros),
     outboundEuros,
     returnEuros,
     roundTripTotalEuros,
@@ -417,7 +435,7 @@ export async function fetchTransportPricing(
       : null,
     normalizedVehicleUsed,
     requestBody: body,
-    soapData: json.data,
+    soapData,
     xrPricingTrace: json.xrPricingTrace,
   };
 }

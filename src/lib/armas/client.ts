@@ -96,6 +96,48 @@ type PaxVehSoapItem = {
   vehiculoEntidad?: VehicleSoapEntity;
 };
 
+type ServicioVentaSoapEntity = {
+  cantidad: number;
+  codigoServicioVenta: string;
+  tipoServicioVenta: string;
+};
+
+export type SalidaSoapEntity = {
+  fechaSalida: string;
+  horaSalida: string;
+  sentidoSalida: number;
+  serviciosVentasEntidad: {
+    servicioVentaEntidad:
+      | ServicioVentaSoapEntity
+      | ServicioVentaSoapEntity[];
+  };
+  trayectoEntidad: {
+    puertoDestinoEntidad: { codigoPuerto: string };
+    puertoOrigenEntidad: { codigoPuerto: string };
+  };
+};
+
+type PaxsVehsSoapEntity = {
+  paxVehEntidad: PaxVehSoapItem | PaxVehSoapItem[];
+};
+
+export type NasaTarificacionesSoapArgs = {
+  contextoEntidad: ArmasContext;
+  salidasEntidad: {
+    salidaEntidad: SalidaSoapEntity | SalidaSoapEntity[];
+  };
+  paxsVehsEntidad: PaxsVehsSoapEntity;
+  bonificacionEntidad: {
+    codigoBonificacion: string;
+  };
+};
+
+export function getFirstSalidaSoapEntity(
+  value: SalidaSoapEntity | SalidaSoapEntity[]
+): SalidaSoapEntity | undefined {
+  return Array.isArray(value) ? value[0] : value;
+}
+
 function normalizeString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
@@ -569,7 +611,7 @@ export type NasaTarificacionesRequestParams = {
 /** Arguments exacts passés à `nasaTarificacionesAsync` (hors client SOAP). */
 export function buildNasaTarificacionesSoapArgs(
   params: NasaTarificacionesRequestParams
-): Record<string, unknown> {
+): NasaTarificacionesSoapArgs {
   const passengerPlan = buildPricingPassengerPlan({
     passengerTipos: params.passengerTipos,
     cantidad: params.cantidad,
@@ -596,7 +638,7 @@ export function buildNasaTarificacionesSoapArgs(
    * Mettre **VR|V avant BY|P** + longueur totale dans `largo` provoque **TF0004** sur
    * les lignes testées (ALG–PTM). L’ordre **V|V** en tête idem.
    */
-  const servicioVentaEntidad =
+  const servicioVentaEntidad: ServicioVentaSoapEntity | ServicioVentaSoapEntity[] =
     companion &&
     companion.codigoServicioVenta?.trim() &&
     companion.tipoServicioVenta?.trim()
@@ -610,35 +652,41 @@ export function buildNasaTarificacionesSoapArgs(
         ]
       : primaryServicio;
 
-  const returnServicioVentaEntidad =
-    params.returnSegment &&
-    companion &&
-    companion.codigoServicioVenta?.trim() &&
-    companion.tipoServicioVenta?.trim()
-      ? [
-          {
-            cantidad: passengerPlan.cantidadServicioVenta,
-            codigoServicioVenta: params.returnSegment.codigoServicioVenta.trim(),
-            tipoServicioVenta: params.returnSegment.tipoServicioVenta.trim(),
-          },
-          {
-            cantidad: companion.cantidad ?? 1,
-            codigoServicioVenta: companion.codigoServicioVenta.trim(),
-            tipoServicioVenta: companion.tipoServicioVenta.trim(),
-          },
-        ]
-      : params.returnSegment
-        ? {
+  let returnServicioVentaEntidad:
+    | ServicioVentaSoapEntity
+    | ServicioVentaSoapEntity[]
+    | undefined;
+  if (params.returnSegment) {
+    if (
+      companion &&
+      companion.codigoServicioVenta?.trim() &&
+      companion.tipoServicioVenta?.trim()
+    ) {
+      returnServicioVentaEntidad = [
+        {
           cantidad: passengerPlan.cantidadServicioVenta,
           codigoServicioVenta: params.returnSegment.codigoServicioVenta.trim(),
           tipoServicioVenta: params.returnSegment.tipoServicioVenta.trim(),
-        }
-        : undefined;
+        },
+        {
+          cantidad: companion.cantidad ?? 1,
+          codigoServicioVenta: companion.codigoServicioVenta.trim(),
+          tipoServicioVenta: companion.tipoServicioVenta.trim(),
+        },
+      ];
+    } else {
+      returnServicioVentaEntidad = {
+        cantidad: passengerPlan.cantidadServicioVenta,
+        codigoServicioVenta: params.returnSegment.codigoServicioVenta.trim(),
+        tipoServicioVenta: params.returnSegment.tipoServicioVenta.trim(),
+      };
+    }
+  }
 
   /** Ne pas forcer `raw` ici : `buildVehicleEntity` applique le défaut remorque (split). */
   const trailerMode = trailerVehiculoEntidadModeFromFlag(params.rawTrailerLength);
 
-  const salidaEntidad = params.returnSegment
+  const salidaEntidad: SalidaSoapEntity | SalidaSoapEntity[] = params.returnSegment
     ? [
         {
           fechaSalida: params.fechaSalida,
@@ -657,7 +705,10 @@ export function buildNasaTarificacionesSoapArgs(
           horaSalida: params.returnSegment.horaSalida,
           sentidoSalida: params.returnSegment.sentidoSalida ?? 2,
           serviciosVentasEntidad: {
-            servicioVentaEntidad: returnServicioVentaEntidad,
+            servicioVentaEntidad:
+              returnServicioVentaEntidad as
+                | ServicioVentaSoapEntity
+                | ServicioVentaSoapEntity[],
           },
           trayectoEntidad: {
             puertoDestinoEntidad: { codigoPuerto: params.returnSegment.destino },
@@ -681,7 +732,7 @@ export function buildNasaTarificacionesSoapArgs(
   return {
     contextoEntidad: buildArmasContext(),
     salidasEntidad: {
-      salidaEntidad: salidaEntidad as unknown,
+      salidaEntidad,
     },
     paxsVehsEntidad: buildPricingPaxsVehsEntidad({
       tiposPasajero: passengerPlan.tiposPasajero,
@@ -701,12 +752,9 @@ export function buildNasaTarificacionesSoapArgs(
 
 /** `vehiculoEntidad` attaché au premier passager tarifé (pricing). */
 export function extractPricingVehiculoEntidad(
-  args: ReturnType<typeof buildNasaTarificacionesSoapArgs>
+  args: NasaTarificacionesSoapArgs
 ): VehicleSoapEntity | undefined {
-  const raw = args.paxsVehsEntidad.paxVehEntidad as
-    | PaxVehSoapItem
-    | PaxVehSoapItem[]
-    | undefined;
+  const raw = args.paxsVehsEntidad.paxVehEntidad;
   const list = Array.isArray(raw) ? raw : raw != null ? [raw] : [];
   for (const item of list) {
     if (item?.vehiculoEntidad) return item.vehiculoEntidad;
@@ -741,8 +789,7 @@ export async function nasaTarificacionesRequest(
 ) {
   const client = await createArmasSoapClient();
   const args = buildNasaTarificacionesSoapArgs(params);
-  const salidaRaw = (args?.salidasEntidad as { salidaEntidad?: unknown } | undefined)
-    ?.salidaEntidad;
+  const salidaRaw = args.salidasEntidad?.salidaEntidad;
   const salidaList = Array.isArray(salidaRaw)
     ? salidaRaw
     : salidaRaw != null
@@ -813,10 +860,6 @@ export async function nasaTarificacionesRequest(
 
   return result;
 }
-
-export type NasaTarificacionesSoapArgs = ReturnType<
-  typeof buildNasaTarificacionesSoapArgs
->;
 
 /**
  * Appel `nasaTarificaciones` avec des arguments SOAP déjà construits (lab / probe uniquement).

@@ -134,6 +134,10 @@ import {
       .map((s) => ({
         codigoServicioVenta: normalizeString(s.codigoServicioVenta),
         tipoServicioVenta: normalizeString(s.tipoServicioVenta),
+        disponibles:
+          typeof s.disponibles === "number" && Number.isFinite(s.disponibles)
+            ? Math.floor(s.disponibles)
+            : undefined,
         textoCorto: normalizeString(s.textoCorto),
         textoLargo: normalizeString(s.textoLargo),
       }))
@@ -302,6 +306,7 @@ import {
         fechaIda: normalizeString(search.fechaIda),
         fechaVuelta: normalizeString(search.fechaVuelta),
         bonificacion: normalizeString(search.bonificacion, "G"),
+        bonificacionLabel: normalizeString(search.bonificacionLabel),
         passengers: {
           adults: normalizeNumber(passengers.adults, 1),
           youth: normalizeNumber(passengers.youth, 0),

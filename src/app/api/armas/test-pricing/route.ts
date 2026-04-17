@@ -4,7 +4,7 @@ import {
   buildNasaTarificacionesSoapArgs,
   extractPricingVehiculoEntidad,
   extractNasaTarificacionesReturnMeta,
-  nasaTarificacionesRequest,
+  nasaTarificacionesRequestWithSoapArgs,
   trailerVehiculoEntidadModeFromFlag,
 } from "@/lib/armas/client";
 import {
@@ -15,7 +15,10 @@ import {
   sumPrecioBlocksFromNasaTarificacionesResult,
   sumPrecioTotalFromNasaTarificacionesResult,
 } from "@/lib/armas/tarificacion-normalize";
-import type { TarificacionRequestBody } from "@/lib/armas/tarificacion-request-types";
+import type {
+  TarificacionRequestBody,
+  TarificacionServiceLine,
+} from "@/lib/armas/tarificacion-request-types";
 import { prepareNasaPricingCall } from "@/lib/armas/prepare-nasa-pricing-call";
 import { buildPricingSoapTraceEcho } from "@/lib/armas/pricing-soap-trace-echo";
 import {
@@ -132,8 +135,85 @@ function parsePassengerTipos(raw: string | null | undefined): string[] | undefin
 }
 
 async function runTarificacion(input: TarificacionRequestBody) {
-  const params = prepareNasaPricingCall(input);
-  return nasaTarificacionesRequest(params);
+  const plan = buildTarificacionExecutionPlan(input);
+  return nasaTarificacionesRequestWithSoapArgs(plan.soapArgs, {
+    pricingSoapTrace: plan.nasaParams.pricingSoapTrace === true,
+  });
+}
+
+function normalizeServiceLines(
+  raw: unknown
+): TarificacionServiceLine[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const lines = raw
+    .map((item) => {
+      const row =
+        item && typeof item === "object"
+          ? (item as Record<string, unknown>)
+          : null;
+      if (!row) return null;
+
+      const cantidadRaw = row.cantidad;
+      const cantidad =
+        typeof cantidadRaw === "number" && Number.isFinite(cantidadRaw)
+          ? Math.floor(cantidadRaw)
+          : typeof cantidadRaw === "string" && cantidadRaw.trim()
+            ? Math.floor(Number(cantidadRaw.trim().replace(",", ".")))
+            : 0;
+
+      const codigoServicioVenta = normalizeString(
+        typeof row.codigoServicioVenta === "string"
+          ? row.codigoServicioVenta
+          : null
+      );
+      const tipoServicioVenta = normalizeString(
+        typeof row.tipoServicioVenta === "string"
+          ? row.tipoServicioVenta
+          : null
+      );
+
+      if (cantidad <= 0 || !codigoServicioVenta || !tipoServicioVenta) {
+        return null;
+      }
+
+      return {
+        cantidad,
+        codigoServicioVenta,
+        tipoServicioVenta,
+      };
+    })
+    .filter((line): line is TarificacionServiceLine => line !== null);
+
+  return lines.length > 0 ? lines : undefined;
+}
+
+function buildTarificacionExecutionPlan(input: TarificacionRequestBody) {
+  const nasaParams = prepareNasaPricingCall(input);
+  const soapArgs = buildNasaTarificacionesSoapArgs(nasaParams);
+
+  const primaryServiceLines = normalizeServiceLines(input.serviceLines);
+  const returnServiceLines = normalizeServiceLines(input.returnServiceLines);
+  const salidaRaw = soapArgs.salidasEntidad.salidaEntidad;
+
+  if (primaryServiceLines?.length) {
+    const firstSalida = Array.isArray(salidaRaw) ? salidaRaw[0] : salidaRaw;
+    if (firstSalida) {
+      firstSalida.serviciosVentasEntidad = {
+        servicioVentaEntidad: primaryServiceLines,
+      };
+    }
+  }
+
+  if (returnServiceLines?.length && Array.isArray(salidaRaw) && salidaRaw[1]) {
+    salidaRaw[1].serviciosVentasEntidad = {
+      servicioVentaEntidad: returnServiceLines,
+    };
+  }
+
+  return {
+    nasaParams,
+    soapArgs,
+  };
 }
 
 function armaDebugResponseAllowed(request: NextRequest) {
@@ -229,7 +309,9 @@ export async function POST(request: NextRequest) {
     vehiclePassengerIndex: body.vehiclePassengerIndex,
     vehicleData: body.vehicleData,
     companionServicioVenta: body.companionServicioVenta,
+    serviceLines: normalizeServiceLines(body.serviceLines),
     returnSegment: body.returnSegment,
+    returnServiceLines: normalizeServiceLines(body.returnServiceLines),
     rawTrailerLength: coerceRawTrailerLength(body.rawTrailerLength),
     pricingSoapTrace: pricingSoapTraceFromPostBody(body) ? true : undefined,
   };
@@ -443,8 +525,7 @@ export async function POST(request: NextRequest) {
       (xrPricingTraceEnabled() || postBody.pricingSoapTrace === true);
 
     if (wantXrPricingTrace) {
-      const nasaParams = prepareNasaPricingCall(postBody);
-      const soapArgs = buildNasaTarificacionesSoapArgs(nasaParams);
+      const { nasaParams, soapArgs } = buildTarificacionExecutionPlan(postBody);
       const xrRecord = buildXrPricingTraceRecord(
         postBody,
         nasaParams,
@@ -460,8 +541,7 @@ export async function POST(request: NextRequest) {
       normalizeString(request.headers.get("x-solair-arma-debug")) === "1";
 
     if (postDebug) {
-      const nasaParams = prepareNasaPricingCall(postBody);
-      const soapArgs = buildNasaTarificacionesSoapArgs(nasaParams);
+      const { nasaParams, soapArgs } = buildTarificacionExecutionPlan(postBody);
       json.armaDebug = {
         debugLabel: "POST",
         bodyEcho: postBody,
@@ -479,8 +559,7 @@ export async function POST(request: NextRequest) {
 
     /* Trace top-level : tout véhicule si `pricingSoapTrace` / `pricingTrace` dans le body. */
     if (postBody.pricingSoapTrace === true) {
-      const nasaParams = prepareNasaPricingCall(postBody);
-      const soapArgs = buildNasaTarificacionesSoapArgs(nasaParams);
+      const { nasaParams, soapArgs } = buildTarificacionExecutionPlan(postBody);
       json.pricingSoapTraceEcho = buildPricingSoapTraceEcho({
         postBody,
         nasaParams,

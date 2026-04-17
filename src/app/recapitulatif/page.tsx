@@ -28,6 +28,7 @@ import { fetchTransportPricing } from "@/lib/armas/transport-pricing-client";
 import { isArmasRtPricingDebugEnabled } from "@/lib/armas/rt-pricing-debug";
 import { getTarificacionRawLinesFromSoapResult } from "@/lib/armas/tarificacion-normalize";
 import { getLegacyVehicleForPricingParam } from "@/lib/solair-legacy-vehicle-pricing";
+import { getCommercialLabel } from "@/lib/ui/armas-commercial";
 
 type PricingLine = {
   bonificacionEntidad?: {
@@ -120,18 +121,7 @@ function formatApiTime(value?: string) {
 }
 
 function serviceLabel(code?: string) {
-  switch (code) {
-    case "BY":
-      return "Option passager BY";
-    case "BP":
-      return "Option passager BP";
-    case "P":
-      return "Option duo P";
-    case "Q":
-      return "Option famille Q";
-    default:
-      return code ? `Service ${code}` : "Service passager";
-  }
+  return getCommercialLabel({ codigoServicioVenta: code, tipoServicioVenta: "P" });
 }
 
 function passengerTypeLabel(code: string) {
@@ -351,7 +341,7 @@ function SectionCard({
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_10px_28px_rgba(15,23,42,0.05)] sm:p-6">
+    <section className="solair-panel p-5 sm:p-6">
       <div className="mb-5">
         <h2 className="text-xl font-bold text-slate-900">{title}</h2>
         {subtitle ? <p className="mt-1 text-sm text-slate-500">{subtitle}</p> : null}
@@ -1240,22 +1230,22 @@ export default function RecapitulatifPage() {
 
   return (
     <main className="min-h-screen bg-[#F7F5F2] text-slate-900">
-      <section className="bg-[#163B6D] pb-8 pt-5">
-        <div className="mx-auto max-w-7xl px-4">
-          <div className="mb-5 flex flex-wrap items-center gap-2">
-            <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-[#163B6D]">
+      <section className="solair-hero pb-8 pt-5">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6">
+          <div className="solair-stepbar mb-5">
+            <span className="solair-stepchip solair-stepchip--done">
               1. Recherche
             </span>
-            <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-[#163B6D]">
+            <span className="solair-stepchip solair-stepchip--done">
               2. Traversées et prix
             </span>
-            <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-[#163B6D]">
+            <span className="solair-stepchip solair-stepchip--done">
               3. Hébergement
             </span>
-            <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-[#163B6D]">
+            <span className="solair-stepchip solair-stepchip--done">
               4. Passager
             </span>
-            <span className="rounded-full bg-[#F28C28] px-3 py-1 text-xs font-semibold text-white">
+            <span className="solair-stepchip solair-stepchip--active">
               5. Récapitulatif
             </span>
           </div>
@@ -1276,7 +1266,7 @@ export default function RecapitulatifPage() {
             <button
               type="button"
               onClick={() => router.back()}
-              className="rounded-2xl border border-white/20 bg-white/10 px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/20"
+              className="solair-secondary-btn px-4 py-3 text-sm font-semibold"
             >
               Retour
             </button>
@@ -1637,7 +1627,8 @@ export default function RecapitulatifPage() {
                       <span className="text-right text-sm font-semibold text-slate-900">
                         {discountLabel(
                           bookingFlow.search.bonificacion,
-                          outboundPricing.bonificationLabel
+                          outboundPricing.bonificationLabel ||
+                            bookingFlow.search.bonificacionLabel
                         )}
                       </span>
                     </div>

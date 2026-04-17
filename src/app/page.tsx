@@ -7,7 +7,11 @@ import {
   type FormEvent,
   type ReactNode,
 } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { HomeMaritimeHeader, HomePromoOffers } from "@/components/home";
+import { DayPicker } from "react-day-picker";
+import "react-day-picker/style.css";
 import {
   createEmptyBookingFlow,
   type BookingFlow,
@@ -48,7 +52,37 @@ type PortsApiResponse = {
   };
 };
 
-type DiscountMode = "G" | "R" | "F1";
+type TrayectosApiResponse = {
+  ok: boolean;
+  message?: string;
+  error?: string;
+  destinos?: Port[];
+};
+
+type AvailableDatesApiResponse = {
+  ok: boolean;
+  message?: string;
+  error?: string;
+  availableDates?: string[];
+};
+
+type DiscountOption = {
+  code: string;
+  shortLabel: string;
+  longLabel: string;
+};
+
+type HomeHeaderLink = {
+  label: string;
+  href: string;
+};
+
+type DiscountsApiResponse = {
+  ok: boolean;
+  message?: string;
+  error?: string;
+  discounts?: DiscountOption[];
+};
 
 type AnimalState = {
   enabled: boolean;
@@ -123,6 +157,30 @@ const VEHICLE_UI_ROWS: VehicleUiRow[] = [
     icon: "car",
   },
 ];
+
+/**
+ * Header d'accueil éditable rapidement.
+ * Tu peux modifier ici les libellés et les liens visibles en haut du site.
+ */
+const HOME_HEADER_LINKS: HomeHeaderLink[] = [
+  { label: "Réserver", href: "#reservation-form" },
+  { label: "Gérer ma réservation", href: "/retrouver-ma-reservation" },
+  { label: "Horaires & tarifs", href: "#reservation-form" },
+];
+
+const HOME_HEADER_TOP_LINKS: HomeHeaderLink[] = [
+  { label: "Actualités", href: "#" },
+  { label: "FAQ", href: "#" },
+  { label: "Besoin d’aide ?", href: "#" },
+  { label: "Français", href: "#" },
+];
+
+/**
+ * Image de fond d'accueil.
+ * Dépose simplement ta photo dans `public/hero-solair-home.jpg`
+ * puis remplace ce chemin si besoin.
+ */
+const HOME_HERO_BACKGROUND_IMAGE = "/hero-solair-home.jpg";
 
 type VehicleTrailerRowKey = Extract<
   VehicleUiRowKey,
@@ -326,11 +384,129 @@ function getTodayInputDate() {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+function toInputDateFromApi(yyyymmdd: string) {
+  if (!/^\d{8}$/.test(yyyymmdd)) return "";
+  return `${yyyymmdd.slice(0, 4)}-${yyyymmdd.slice(4, 6)}-${yyyymmdd.slice(6, 8)}`;
+}
+
 function formatDisplayDate(value: string) {
   if (!value) return "";
   const [yyyy, mm, dd] = value.split("-");
   if (!yyyy || !mm || !dd) return value;
   return `${dd}/${mm}/${yyyy}`;
+}
+
+function parseInputDate(value?: string) {
+  if (!value) return undefined;
+  const [yyyy, mm, dd] = value.split("-").map(Number);
+  if (!yyyy || !mm || !dd) return undefined;
+  return new Date(yyyy, mm - 1, dd);
+}
+
+function toInputDate(date: Date) {
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function DateAvailabilityPicker({
+  value,
+  onChange,
+  disabled,
+  loading,
+  availableDates,
+  placeholder,
+  minDate,
+  variant = "default",
+}: {
+  value: string;
+  onChange: (next: string) => void;
+  disabled?: boolean;
+  loading?: boolean;
+  availableDates: string[];
+  placeholder: string;
+  minDate?: string;
+  variant?: "default" | "desktop";
+}) {
+  const [open, setOpen] = useState(false);
+  const selectedDate = parseInputDate(value);
+  const isOpen = open && !disabled;
+
+  const allowedSet = useMemo(() => {
+    const filtered = minDate
+      ? availableDates.filter((d) => d >= minDate)
+      : availableDates;
+    return new Set(filtered);
+  }, [availableDates, minDate]);
+
+  const firstAllowed = useMemo(() => {
+    const first = Array.from(allowedSet).sort()[0];
+    return first ? parseInputDate(first) : undefined;
+  }, [allowedSet]);
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => {
+          if (disabled) return;
+          setOpen((v) => !v);
+        }}
+        className={`w-full border border-slate-200 bg-white text-left text-slate-800 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100 ${
+          variant === "desktop"
+            ? "min-h-[52px] rounded-lg px-3.5 py-2.5 text-sm font-medium"
+            : "min-h-[48px] rounded-lg px-4 py-3 text-base"
+        }`}
+      >
+        {loading
+          ? "Chargement des dates disponibles..."
+          : value
+            ? formatDisplayDate(value)
+            : placeholder}
+      </button>
+
+      {isOpen ? (
+        <div className="absolute left-0 top-[calc(100%+8px)] z-40 rounded-2xl border border-slate-200 bg-white p-3 shadow-xl">
+          <DayPicker
+            mode="single"
+            selected={selectedDate}
+            defaultMonth={selectedDate || firstAllowed}
+            onSelect={(date) => {
+              if (!date) return;
+              const next = toInputDate(date);
+              if (!allowedSet.has(next)) return;
+              onChange(next);
+              setOpen(false);
+            }}
+            disabled={(date) => !allowedSet.has(toInputDate(date))}
+            showOutsideDays
+            classNames={{
+              months: "flex flex-col",
+              month: "space-y-3",
+              caption: "flex items-center justify-between px-2",
+              caption_label: "text-lg font-semibold text-slate-800",
+              nav_button:
+                "h-8 w-8 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50",
+              table: "w-full border-collapse",
+              head_row: "flex",
+              head_cell:
+                "w-10 text-center text-xs font-semibold uppercase text-slate-500",
+              row: "mt-1 flex w-full",
+              cell: "h-10 w-10 text-center text-sm p-0 relative",
+              day: "h-10 w-10 rounded-full font-medium text-slate-700 hover:bg-slate-100",
+              day_today: "text-[#163B6D] font-bold",
+              day_selected:
+                "bg-[#163B6D] text-white hover:bg-[#163B6D] focus:bg-[#163B6D]",
+              day_disabled: "text-slate-300 opacity-100 cursor-not-allowed",
+              day_outside: "text-slate-300",
+            }}
+          />
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 function ShipIcon() {
@@ -441,15 +617,21 @@ function SearchCard({
   children: ReactNode;
 }) {
   return (
-    <div className="min-h-[126px] rounded-[24px] bg-[#F3F6F7] p-4">
+    <div className="rounded-xl border border-slate-200 bg-white p-3.5 sm:p-4">
       <div className="flex items-start gap-3">
-        <div className="mt-0.5 text-[#163B6D]">{icon}</div>
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#F0F5FA] text-[#163B6D] [&_svg]:h-5 [&_svg]:w-5">
+          {icon}
+        </div>
         <div className="min-w-0 flex-1">
-          <p className="text-[15px] font-semibold text-[#1F2F46]">{title}</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            {title}
+          </p>
           {subtitle ? (
-            <p className="mt-1 text-sm text-slate-500">{subtitle}</p>
+            <p className="mt-0.5 truncate text-sm font-medium text-slate-800">
+              {subtitle}
+            </p>
           ) : null}
-          <div className="mt-3">{children}</div>
+          <div className="mt-2.5">{children}</div>
         </div>
       </div>
     </div>
@@ -459,18 +641,80 @@ function SearchCard({
 function SelectionButton({
   label,
   onClick,
+  variant = "default",
 }: {
   label: string;
   onClick: () => void;
+  variant?: "default" | "desktop";
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-left text-base text-slate-700 transition hover:bg-slate-50"
+      className={`w-full border border-slate-200 bg-white text-left text-sm font-medium text-slate-800 transition hover:border-slate-300 hover:bg-slate-50 ${
+        variant === "desktop"
+          ? "min-h-[52px] rounded-lg px-3.5 py-2.5"
+          : "min-h-[48px] rounded-lg px-3.5 py-2.5"
+      }`}
     >
-      {label}
+      <span className={variant === "desktop" ? "block truncate" : "block"}>
+        {label}
+      </span>
     </button>
+  );
+}
+
+function DesktopSearchField({
+  icon,
+  title,
+  subtitle,
+  children,
+  layout = "card",
+}: {
+  icon: ReactNode;
+  title: string;
+  subtitle?: string;
+  children: ReactNode;
+  layout?: "card" | "panel";
+}) {
+  if (layout === "panel") {
+    return (
+      <div className="flex min-h-full min-w-0 flex-col p-3 sm:p-4">
+        <div className="mb-2 flex items-start gap-2.5">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#F0F5FA] text-[#163B6D] [&_svg]:h-[18px] [&_svg]:w-[18px]">
+            {icon}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+              {title}
+            </p>
+            {subtitle ? (
+              <p className="mt-0.5 truncate text-xs text-slate-500">{subtitle}</p>
+            ) : null}
+          </div>
+        </div>
+        <div className="mt-auto min-w-0">{children}</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white px-3.5 py-3">
+      <div className="mb-2 flex items-center gap-2.5">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#F0F5FA] text-[#163B6D] [&_svg]:h-[18px] [&_svg]:w-[18px]">
+          {icon}
+        </div>
+        <div className="min-w-0">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            {title}
+          </p>
+          {subtitle ? (
+            <p className="truncate text-sm font-medium text-slate-800">{subtitle}</p>
+          ) : null}
+        </div>
+      </div>
+      {children}
+    </div>
   );
 }
 
@@ -497,7 +741,7 @@ function ResponsivePicker({
       />
 
       <div className="absolute inset-x-0 bottom-0 md:inset-0 md:flex md:items-center md:justify-center md:p-6">
-        <div className="relative w-full rounded-t-[28px] bg-white p-5 shadow-2xl md:max-w-2xl md:rounded-[28px] md:p-6">
+        <div className="relative w-full rounded-t-[28px] bg-white p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-2xl md:max-w-2xl md:rounded-[28px] md:p-6">
           <div className="mx-auto mb-4 h-1.5 w-14 rounded-full bg-slate-300 md:hidden" />
 
           <div className="mb-5 flex items-center justify-between gap-4">
@@ -511,7 +755,7 @@ function ResponsivePicker({
             </button>
           </div>
 
-          <div className="max-h-[72vh] overflow-y-auto pr-1">{children}</div>
+          <div className="max-h-[78vh] overflow-y-auto pr-1">{children}</div>
         </div>
       </div>
     </div>
@@ -558,7 +802,7 @@ function CounterRow({
   onChange: (next: number) => void;
 }) {
   return (
-    <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-4">
+    <div className="flex items-center justify-between rounded-[22px] border border-slate-200 bg-white px-4 py-4 shadow-sm">
       <div className="pr-4">
         <p className="text-base font-semibold text-slate-900">{label}</p>
         <p className="mt-1 text-sm text-slate-500">{hint}</p>
@@ -609,7 +853,7 @@ function VehiclePickerLine({
   incrementDisabled?: boolean;
 }) {
   return (
-    <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-3 sm:gap-4 sm:px-4">
+    <div className="flex items-center gap-3 rounded-[22px] border border-slate-200 bg-white px-3 py-3 shadow-sm sm:gap-4 sm:px-4">
       <div className="shrink-0">{icon}</div>
       <div className="min-w-0 flex-1 pr-1">
         <p className="text-[15px] font-semibold leading-snug text-slate-900">
@@ -647,49 +891,99 @@ function VehiclePickerLine({
 function TripTypeToggle({
   value,
   onChange,
+  variant = "dark",
+  buttonOrder = "one_way_first",
 }: {
   value: BookingTripType;
   onChange: (next: BookingTripType) => void;
+  variant?: "dark" | "light";
+  buttonOrder?: "one_way_first" | "round_trip_first";
 }) {
+  const isLight = variant === "light";
+  const wrap = `inline-flex w-full max-w-full rounded-lg p-0.5 sm:w-auto ${
+    isLight ? "bg-slate-100" : "bg-white/10"
+  }`;
+  const inactive = isLight
+    ? "text-slate-600 hover:bg-white/70"
+    : "text-white hover:bg-white/10";
+  const active = "bg-white text-[#163B6D] shadow-sm";
+
+  const btnRt = (
+    <button
+      type="button"
+      onClick={() => onChange("round_trip")}
+      className={`flex-1 rounded-md px-3 py-2.5 text-sm font-semibold transition sm:px-4 ${
+        value === "round_trip" ? active : inactive
+      }`}
+    >
+      Aller-retour
+    </button>
+  );
+  const btnOw = (
+    <button
+      type="button"
+      onClick={() => onChange("one_way")}
+      className={`flex-1 rounded-md px-3 py-2.5 text-sm font-semibold transition sm:px-4 ${
+        value === "one_way" ? active : inactive
+      }`}
+    >
+      Aller simple
+    </button>
+  );
+
   return (
-    <div className="inline-flex rounded-2xl bg-white/10 p-1">
-      <button
-        type="button"
-        onClick={() => onChange("one_way")}
-        className={`rounded-2xl px-4 py-2 text-sm font-semibold transition ${
-          value === "one_way"
-            ? "bg-white text-[#163B6D]"
-            : "text-white hover:bg-white/10"
-        }`}
-      >
-        Aller simple
-      </button>
-      <button
-        type="button"
-        onClick={() => onChange("round_trip")}
-        className={`rounded-2xl px-4 py-2 text-sm font-semibold transition ${
-          value === "round_trip"
-            ? "bg-white text-[#163B6D]"
-            : "text-white hover:bg-white/10"
-        }`}
-      >
-        Aller-retour
-      </button>
+    <div className={wrap} role="group" aria-label="Type de trajet">
+      {buttonOrder === "round_trip_first" ? (
+        <>
+          {btnRt}
+          {btnOw}
+        </>
+      ) : (
+        <>
+          {btnOw}
+          {btnRt}
+        </>
+      )}
     </div>
   );
 }
 
-function getDiscountLabel(discount: DiscountMode) {
-  switch (discount) {
+const DEFAULT_DISCOUNT_OPTION: DiscountOption = {
+  code: "G",
+  shortLabel: "Tarif général",
+  longLabel: "Aucune réduction particulière",
+};
+
+function fallbackDiscountLabel(code?: string) {
+  const normalized = String(code || "").trim().toUpperCase();
+  switch (normalized) {
     case "G":
       return "Tarif général";
     case "R":
       return "Résident";
+    case "R1":
+      return "Résident + famille nombreuse générale";
+    case "R2":
+      return "Résident + famille nombreuse spéciale";
     case "F1":
       return "Famille nombreuse";
+    case "F2":
+      return "Famille nombreuse spéciale";
     default:
-      return "Tarif général";
+      return normalized || DEFAULT_DISCOUNT_OPTION.shortLabel;
   }
+}
+
+function getDiscountLabel(
+  discountCode: string,
+  options?: DiscountOption[],
+  persistedLabel?: string
+) {
+  const normalized = String(discountCode || "").trim().toUpperCase();
+  const matched = options?.find((option) => option.code === normalized);
+  if (matched?.shortLabel) return matched.shortLabel;
+  if (persistedLabel?.trim()) return persistedLabel.trim();
+  return fallbackDiscountLabel(normalized);
 }
 
 function getPassengerSummary(passengers: BookingPassengerCounts) {
@@ -879,6 +1173,19 @@ export default function HomePage() {
   const [destino, setDestino] = useState("");
   const [dateIda, setDateIda] = useState("");
   const [dateVuelta, setDateVuelta] = useState("");
+  const [availableDestinationsByOrigin, setAvailableDestinationsByOrigin] =
+    useState<Port[]>([]);
+  const [loadingDestinations, setLoadingDestinations] = useState(false);
+  const [availableOutboundDates, setAvailableOutboundDates] = useState<string[]>(
+    []
+  );
+  const [availableInboundDates, setAvailableInboundDates] = useState<string[]>([]);
+  const [loadingOutboundDates, setLoadingOutboundDates] = useState(false);
+  const [loadingInboundDates, setLoadingInboundDates] = useState(false);
+  const [availableDiscounts, setAvailableDiscounts] = useState<DiscountOption[]>([
+    DEFAULT_DISCOUNT_OPTION,
+  ]);
+  const [loadingDiscounts, setLoadingDiscounts] = useState(false);
 
   const [sheet, setSheet] = useState<
     | null
@@ -924,7 +1231,10 @@ export default function HomePage() {
     useState<VehicleSheetDraft | null>(null);
   const [vehicleSheetError, setVehicleSheetError] = useState("");
 
-  const [discountMode, setDiscountMode] = useState<DiscountMode>("G");
+  const [discountMode, setDiscountMode] = useState("G");
+  const [discountModeLabel, setDiscountModeLabel] = useState(
+    DEFAULT_DISCOUNT_OPTION.shortLabel
+  );
 
   useEffect(() => {
     const flow = getBookingFlow();
@@ -969,14 +1279,235 @@ export default function HomePage() {
           : "1.9-2.8"
       );
     }
-    setDiscountMode((flow.search.bonificacion as DiscountMode) || "G");
+    setDiscountMode((flow.search.bonificacion || "G").trim().toUpperCase());
+    setDiscountModeLabel(
+      flow.search.bonificacionLabel?.trim() || DEFAULT_DISCOUNT_OPTION.shortLabel
+    );
   }, []);
 
   useEffect(() => {
-    if (!dateIda) {
-      setDateIda(getTodayInputDate());
+    if (!origen || !destino) {
+      setAvailableDiscounts([DEFAULT_DISCOUNT_OPTION]);
+      setLoadingDiscounts(false);
+      return;
     }
-  }, [dateIda]);
+
+    let cancelled = false;
+    setLoadingDiscounts(true);
+
+    void (async () => {
+      try {
+        const response = await fetch(
+          `/api/armas/test-discounts?origen=${encodeURIComponent(
+            origen
+          )}&destino=${encodeURIComponent(destino)}`,
+          { cache: "no-store" }
+        );
+        const json: DiscountsApiResponse = await response.json();
+        if (cancelled) return;
+
+        const nextOptions =
+          response.ok && json.ok && Array.isArray(json.discounts) && json.discounts.length > 0
+            ? json.discounts
+            : [DEFAULT_DISCOUNT_OPTION];
+
+        setAvailableDiscounts(nextOptions);
+
+        const normalizedCurrent = discountMode.trim().toUpperCase();
+        const current =
+          nextOptions.find((option) => option.code === normalizedCurrent) ??
+          nextOptions.find((option) => option.code === "G") ??
+          nextOptions[0];
+
+        if (!current) return;
+
+        if (current.code !== normalizedCurrent) {
+          setDiscountMode(current.code);
+        }
+        setDiscountModeLabel(current.shortLabel || fallbackDiscountLabel(current.code));
+      } catch {
+        if (!cancelled) {
+          setAvailableDiscounts([DEFAULT_DISCOUNT_OPTION]);
+          if (discountMode.trim().toUpperCase() === "G") {
+            setDiscountModeLabel(DEFAULT_DISCOUNT_OPTION.shortLabel);
+          }
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingDiscounts(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [origen, destino, discountMode]);
+
+  useEffect(() => {
+    setDateIda((prev) => prev || getTodayInputDate());
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadAvailableDestinations() {
+      if (!origen) {
+        setAvailableDestinationsByOrigin([]);
+        return;
+      }
+
+      try {
+        setLoadingDestinations(true);
+        const response = await fetch(
+          `/api/armas/test-trayectos?origen=${encodeURIComponent(origen)}`,
+          { cache: "no-store" }
+        );
+        const json: TrayectosApiResponse = await response.json();
+        if (!response.ok || !json.ok) {
+          throw new Error(
+            json.error ||
+              json.message ||
+              "Impossible de charger les destinations disponibles."
+          );
+        }
+        if (!cancelled) {
+          setAvailableDestinationsByOrigin(
+            (json.destinos || []).sort((a, b) =>
+              a.textoCorto.localeCompare(b.textoCorto)
+            )
+          );
+        }
+      } catch {
+        if (!cancelled) {
+          setAvailableDestinationsByOrigin([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingDestinations(false);
+        }
+      }
+    }
+
+    loadAvailableDestinations();
+    return () => {
+      cancelled = true;
+    };
+  }, [origen]);
+
+  useEffect(() => {
+    if (!destino) return;
+    const isStillValid = availableDestinationsByOrigin.some(
+      (port) => port.codigoPuerto === destino
+    );
+    if (!isStillValid) {
+      setDestino("");
+      setDateIda("");
+      setDateVuelta("");
+    }
+  }, [availableDestinationsByOrigin, destino]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadAvailableDates() {
+      if (!origen || !destino) {
+        setAvailableOutboundDates([]);
+        setAvailableInboundDates([]);
+        return;
+      }
+
+      const start = toApiDate(getTodayInputDate());
+      setLoadingOutboundDates(true);
+      setLoadingInboundDates(tripType === "round_trip");
+
+      try {
+        const outboundResponse = await fetch(
+          `/api/armas/test-available-dates?origen=${encodeURIComponent(
+            origen
+          )}&destino=${encodeURIComponent(
+            destino
+          )}&startDate=${start}&days=45&concurrency=8`,
+          { cache: "no-store" }
+        );
+        const outboundJson: AvailableDatesApiResponse =
+          await outboundResponse.json();
+        if (!outboundResponse.ok || !outboundJson.ok) {
+          throw new Error(
+            outboundJson.error ||
+              outboundJson.message ||
+              "Impossible de charger les dates aller."
+          );
+        }
+
+        const outbound = (outboundJson.availableDates || [])
+          .map(toInputDateFromApi)
+          .filter(Boolean);
+
+        if (!cancelled) {
+          setAvailableOutboundDates(outbound);
+        }
+
+        if (tripType === "round_trip") {
+          const inboundResponse = await fetch(
+            `/api/armas/test-available-dates?origen=${encodeURIComponent(
+              destino
+            )}&destino=${encodeURIComponent(
+              origen
+            )}&startDate=${start}&days=45&concurrency=8`,
+            { cache: "no-store" }
+          );
+          const inboundJson: AvailableDatesApiResponse =
+            await inboundResponse.json();
+          if (!inboundResponse.ok || !inboundJson.ok) {
+            throw new Error(
+              inboundJson.error ||
+                inboundJson.message ||
+                "Impossible de charger les dates retour."
+            );
+          }
+          if (!cancelled) {
+            setAvailableInboundDates(
+              (inboundJson.availableDates || [])
+                .map(toInputDateFromApi)
+                .filter(Boolean)
+            );
+          }
+        } else if (!cancelled) {
+          setAvailableInboundDates([]);
+        }
+      } catch {
+        if (!cancelled) {
+          setAvailableOutboundDates([]);
+          setAvailableInboundDates([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingOutboundDates(false);
+          setLoadingInboundDates(false);
+        }
+      }
+    }
+
+    loadAvailableDates();
+    return () => {
+      cancelled = true;
+    };
+  }, [origen, destino, tripType]);
+
+  useEffect(() => {
+    if (!dateIda) return;
+    if (!availableOutboundDates.includes(dateIda)) {
+      setDateIda("");
+    }
+  }, [availableOutboundDates, dateIda]);
+
+  useEffect(() => {
+    if (!dateVuelta) return;
+    if (!availableInboundDates.includes(dateVuelta)) {
+      setDateVuelta("");
+    }
+  }, [availableInboundDates, dateVuelta]);
 
   useEffect(() => {
     async function loadPorts() {
@@ -1033,7 +1564,8 @@ export default function HomePage() {
 
   const filteredDestinationOptions = useMemo(() => {
     const search = destinationSearch.trim().toLowerCase();
-    const base = ports.filter((port) => port.codigoPuerto !== origen);
+    const source = origen ? availableDestinationsByOrigin : [];
+    const base = source.filter((port) => port.codigoPuerto !== origen);
 
     if (!search) return base;
 
@@ -1043,7 +1575,7 @@ export default function HomePage() {
       }`.toLowerCase();
       return label.includes(search);
     });
-  }, [ports, destinationSearch, origen]);
+  }, [availableDestinationsByOrigin, destinationSearch, origen]);
 
   const totalPassengers = useMemo(() => {
     return (
@@ -1061,6 +1593,11 @@ export default function HomePage() {
       0
     );
   }, [vehicleSelections]);
+
+  const inboundDateOptions = useMemo(() => {
+    if (!dateIda) return availableInboundDates;
+    return availableInboundDates.filter((d) => d >= dateIda);
+  }, [availableInboundDates, dateIda]);
 
   const canSearch =
     !!origen &&
@@ -1259,6 +1796,7 @@ export default function HomePage() {
       fechaIda: toApiDate(dateIda),
       fechaVuelta: tripType === "round_trip" && dateVuelta ? toApiDate(dateVuelta) : "",
       bonificacion: discountMode,
+      bonificacionLabel: discountModeLabel,
       passengers,
       animals,
       vehicles: vehiclesForFlow,
@@ -1270,216 +1808,556 @@ export default function HomePage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#F7F5F2] text-slate-900">
-      <section className="bg-[#163B6D]">
-        <div className="mx-auto max-w-7xl px-4 py-4">
-          <div className="flex flex-wrap items-center justify-between gap-4 text-white/95">
-            <div className="flex flex-wrap items-center gap-4">
-              <TripTypeToggle value={tripType} onChange={handleTripTypeChange} />
-              <button type="button" className="text-sm font-semibold">
-                Je dispose d&apos;un code promotionnel
-              </button>
-              <button type="button" className="text-sm font-semibold">
-                Euros
-              </button>
-            </div>
+    <main className="min-h-screen bg-[#E5EAEF] text-slate-900">
+      <HomeMaritimeHeader
+        topLinks={HOME_HEADER_TOP_LINKS}
+        mainLinks={HOME_HEADER_LINKS}
+        reservationHref="/retrouver-ma-reservation"
+      />
 
-            <a
-              href="/retrouver-ma-reservation"
-              className="inline-flex rounded-[18px] border border-white/25 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/20"
-            >
-              Retrouver ma réservation
-            </a>
-          </div>
-        </div>
-      </section>
+      <section
+        className="relative isolate w-full overflow-x-hidden bg-[#0a2348]"
+        aria-label="Réserver une traversée"
+      >
+        <div
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+          style={{ backgroundImage: `url('${HOME_HERO_BACKGROUND_IMAGE}')` }}
+        />
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[#0a2348]/82 via-[#0a2348]/52 to-[#0a2348]/88" />
 
-      <section className="bg-[#163B6D] pb-12 pt-3">
-        <div className="mx-auto max-w-7xl px-4">
-          <div className="mb-6 flex items-center justify-center">
-            <div className="rounded-2xl bg-white/95 px-4 py-3 shadow-sm">
-              <img
-                src="/logo-solair-voyages.png"
-                alt="Solair Voyages"
-                className="h-auto w-[180px] sm:w-[240px]"
-              />
-            </div>
-          </div>
+        <div className="relative z-[1] mx-auto max-w-7xl px-3 pb-24 pt-7 sm:px-5 sm:pb-28 sm:pt-9 lg:px-8 lg:pb-32 lg:pt-11">
+          <p className="text-center text-[11px] font-semibold uppercase tracking-[0.2em] text-white/90">
+            Traversées maritimes — Solair Voyages
+          </p>
+          <h1 className="mx-auto mt-2 max-w-3xl text-center text-2xl font-bold leading-tight text-white sm:text-3xl lg:text-[2rem] lg:leading-snug">
+            Réservez votre traversée
+          </h1>
+          <p className="mx-auto mt-2 max-w-xl text-center text-sm text-white/85">
+            Ports, dates disponibles et réservation guidée.
+          </p>
 
-          <div className="rounded-[28px] bg-white p-4 shadow-[0_16px_40px_rgba(15,23,42,0.12)] sm:p-6">
-            <form onSubmit={handleSubmit} className="space-y-5">
-              {loadingPorts && (
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-                  Chargement des ports...
-                </div>
-              )}
-
-              {!loadingPorts && portsError && (
-                <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-                  {portsError}
-                </div>
-              )}
-
-              {!loadingPorts && !portsError && (
-                <>
-                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                    <SearchCard
-                      icon={<ShipIcon />}
-                      title="Origine"
-                      subtitle={selectedOrigin?.textoCorto || "Choisissez un port"}
-                    >
-                      <SelectionButton
-                        label={
-                          selectedOrigin
-                            ? `${selectedOrigin.textoCorto} (${selectedOrigin.codigoPuerto})`
-                            : "Choisir un port de départ"
-                        }
-                        onClick={() => setSheet("origin")}
-                      />
-                    </SearchCard>
-
-                    <SearchCard
-                      icon={<ShipIcon />}
-                      title="Destination"
-                      subtitle={
-                        selectedDestination?.textoCorto ||
-                        "Choisissez une destination"
-                      }
-                    >
-                      <SelectionButton
-                        label={
-                          selectedDestination
-                            ? `${selectedDestination.textoCorto} (${selectedDestination.codigoPuerto})`
-                            : "Choisir une destination"
-                        }
-                        onClick={() => setSheet("destination")}
-                      />
-                    </SearchCard>
-
-                    <SearchCard
-                      icon={<CalendarIcon />}
-                      title="Date aller"
-                      subtitle={
-                        dateIda ? formatDisplayDate(dateIda) : "Choisissez une date"
-                      }
-                    >
-                      <input
-                        type="date"
-                        value={dateIda}
-                        onChange={(e) => setDateIda(e.target.value)}
-                        className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-base outline-none focus:border-[#163B6D]"
-                      />
-                    </SearchCard>
-
-                    <SearchCard
-                      icon={<CalendarIcon />}
-                      title="Date retour"
-                      subtitle={
-                        tripType === "round_trip"
-                          ? dateVuelta
-                            ? formatDisplayDate(dateVuelta)
-                            : "Choisissez une date"
-                          : "Non applicable"
-                      }
-                    >
-                      <input
-                        type="date"
-                        value={dateVuelta}
-                        disabled={tripType !== "round_trip"}
-                        onChange={(e) => setDateVuelta(e.target.value)}
-                        className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-base outline-none focus:border-[#163B6D] disabled:cursor-not-allowed disabled:bg-slate-100"
-                      />
-                    </SearchCard>
-
-                    <SearchCard
-                      icon={<UserIcon />}
-                      title="Passagers"
-                      subtitle={getPassengerSummary(passengers)}
-                    >
-                      <SelectionButton
-                        label={`${totalPassengers} passager${totalPassengers > 1 ? "s" : ""}`}
-                        onClick={() => setSheet("passengers")}
-                      />
-                    </SearchCard>
-
-                    <SearchCard
-                      icon={<PawIcon />}
-                      title="Animaux"
-                      subtitle={getAnimalsSummary(animals)}
-                    >
-                      <SelectionButton
-                        label={getAnimalsSummary(animals)}
-                        onClick={() => setSheet("animals")}
-                      />
-                    </SearchCard>
-
-                    <SearchCard
-                      icon={<CarIcon />}
-                      title="Véhicules"
-                      subtitle={getVehicleSummary(vehicleSelections)}
-                    >
-                      <SelectionButton
-                        label={getVehicleSummary(vehicleSelections)}
-                        onClick={openVehicleSheet}
-                      />
-                    </SearchCard>
-
-                    <SearchCard
-                      icon={<TagIcon />}
-                      title="Réduction"
-                      subtitle={getDiscountLabel(discountMode)}
-                    >
-                      <SelectionButton
-                        label={getDiscountLabel(discountMode)}
-                        onClick={() => setSheet("discount")}
-                      />
-                    </SearchCard>
+          <div
+            id="reservation-form"
+            className="relative z-[2] mx-auto mt-6 w-full max-w-[1080px] sm:mt-8 sm:-translate-y-1 lg:mt-10 lg:-translate-y-2"
+          >
+            <div className="overflow-visible rounded-lg border border-white/45 bg-white/95 shadow-md backdrop-blur-[2px]">
+              <form
+                onSubmit={handleSubmit}
+                className="space-y-4 p-4 sm:p-5 lg:p-6"
+              >
+                {loadingPorts && (
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                    Chargement des ports...
                   </div>
+                )}
 
-                  <div className="flex justify-end">
-                    <button
-                      type="submit"
-                      disabled={!canSearch}
-                      className="rounded-[24px] bg-[#F28C28] px-8 py-5 text-lg font-bold text-white transition hover:bg-[#E57C12] disabled:cursor-not-allowed disabled:bg-slate-300"
-                    >
-                      Voir les traversées et prix
-                    </button>
+                {!loadingPorts && portsError && (
+                  <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                    {portsError}
                   </div>
+                )}
 
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div className="rounded-2xl bg-[#FBE9E7] p-4 ring-1 ring-[#E9B8B2]">
-                      <p className="text-sm font-semibold text-[#1F2F46]">
-                        Tarification
-                      </p>
-                      <p className="mt-2 text-sm text-slate-600">
-                        Les tarifs sont calculés après le choix de la traversée,
-                        selon les passagers, animaux, véhicules et réductions
-                        indiqués dans votre dossier.
-                      </p>
+                {!loadingPorts && !portsError && (
+                  <>
+                    {/* Desktop large — moteur horizontal type ferry */}
+                    <div className="hidden overflow-hidden rounded-lg border border-slate-200 bg-white xl:block">
+                      <div className="border-b border-slate-200 bg-slate-50 px-5 py-3">
+                        <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                          Options de billets
+                        </p>
+                        <div className="mt-2 max-w-md">
+                          <TripTypeToggle
+                            value={tripType}
+                            onChange={handleTripTypeChange}
+                            variant="light"
+                            buttonOrder="round_trip_first"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="border-b border-slate-200">
+                        <p className="px-5 pt-4 text-xs font-bold uppercase tracking-wide text-slate-500">
+                          Destination et dates
+                        </p>
+                        <div className="mt-1 grid min-w-0 divide-y divide-slate-200 xl:grid-cols-4 xl:divide-x xl:divide-y-0">
+                          <DesktopSearchField
+                            layout="panel"
+                            icon={<ShipIcon />}
+                            title="Origine"
+                            subtitle={
+                              selectedOrigin?.textoCorto || "Choisissez un port"
+                            }
+                          >
+                            <SelectionButton
+                              variant="desktop"
+                              label={
+                                selectedOrigin
+                                  ? `${selectedOrigin.textoCorto} (${selectedOrigin.codigoPuerto})`
+                                  : "Choisir un port de départ"
+                              }
+                              onClick={() => setSheet("origin")}
+                            />
+                          </DesktopSearchField>
+
+                          <DesktopSearchField
+                            layout="panel"
+                            icon={<ShipIcon />}
+                            title="Destination"
+                            subtitle={
+                              selectedDestination?.textoCorto ||
+                              "Choisissez une destination"
+                            }
+                          >
+                            <SelectionButton
+                              variant="desktop"
+                              label={
+                                selectedDestination
+                                  ? `${selectedDestination.textoCorto} (${selectedDestination.codigoPuerto})`
+                                  : "Choisir une destination"
+                              }
+                              onClick={() => setSheet("destination")}
+                            />
+                          </DesktopSearchField>
+
+                          <DesktopSearchField
+                            layout="panel"
+                            icon={<CalendarIcon />}
+                            title="Date aller"
+                            subtitle={
+                              dateIda
+                                ? formatDisplayDate(dateIda)
+                                : "Choisissez une date"
+                            }
+                          >
+                            <DateAvailabilityPicker
+                              value={dateIda}
+                              onChange={setDateIda}
+                              disabled={
+                                !origen || !destino || loadingOutboundDates
+                              }
+                              loading={loadingOutboundDates}
+                              availableDates={availableOutboundDates}
+                              placeholder="Choisissez une date"
+                              variant="desktop"
+                            />
+                          </DesktopSearchField>
+
+                          <DesktopSearchField
+                            layout="panel"
+                            icon={<CalendarIcon />}
+                            title="Date retour"
+                            subtitle={
+                              tripType === "round_trip"
+                                ? dateVuelta
+                                  ? formatDisplayDate(dateVuelta)
+                                  : "Choisissez une date"
+                                : "Non applicable"
+                            }
+                          >
+                            <DateAvailabilityPicker
+                              value={dateVuelta}
+                              onChange={setDateVuelta}
+                              disabled={
+                                tripType !== "round_trip" ||
+                                !origen ||
+                                !destino ||
+                                !dateIda ||
+                                loadingInboundDates
+                              }
+                              loading={loadingInboundDates}
+                              availableDates={inboundDateOptions}
+                              placeholder="Choisissez une date"
+                              minDate={dateIda || undefined}
+                              variant="desktop"
+                            />
+                          </DesktopSearchField>
+                        </div>
+                      </div>
+
+                      <div className="border-b border-slate-200 px-5 py-4">
+                        <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                          Passagers et transport véhicule
+                        </p>
+                        <div className="mt-3 flex min-w-0 flex-col gap-4 xl:flex-row xl:items-stretch">
+                          <div className="min-w-0 flex-1">
+                            <DesktopSearchField
+                              layout="panel"
+                              icon={<UserIcon />}
+                              title="Passagers"
+                              subtitle={getPassengerSummary(passengers)}
+                            >
+                              <SelectionButton
+                                variant="desktop"
+                                label={`${totalPassengers} passager${totalPassengers > 1 ? "s" : ""}`}
+                                onClick={() => setSheet("passengers")}
+                              />
+                            </DesktopSearchField>
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <DesktopSearchField
+                              layout="panel"
+                              icon={<CarIcon />}
+                              title="Transport véhicule"
+                              subtitle={getVehicleSummary(vehicleSelections)}
+                            >
+                              <SelectionButton
+                                variant="desktop"
+                                label={getVehicleSummary(vehicleSelections)}
+                                onClick={openVehicleSheet}
+                              />
+                            </DesktopSearchField>
+                          </div>
+                          <div className="flex min-w-0 shrink-0 flex-col justify-end xl:w-52">
+                            <button
+                              type="submit"
+                              disabled={!canSearch}
+                              className="inline-flex min-h-[52px] w-full items-center justify-center rounded-md bg-[#163B6D] px-4 py-3.5 text-center text-base font-bold text-white shadow-sm transition hover:bg-[#0f2d55] focus-visible:outline focus-visible:ring-2 focus-visible:ring-[#163B6D]/45 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-400"
+                            >
+                              Rechercher
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col gap-2 bg-slate-50 px-5 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-6 sm:gap-y-2">
+                        <span className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                          Plus d’options
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setSheet("animals")}
+                          className="min-h-[44px] text-left text-sm font-semibold text-[#163B6D] underline decoration-[#163B6D]/30 underline-offset-2 transition hover:decoration-[#163B6D] focus-visible:outline focus-visible:ring-2 focus-visible:ring-[#163B6D]/35 focus-visible:ring-offset-2"
+                        >
+                          Animaux — {getAnimalsSummary(animals)}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSheet("discount")}
+                          className="min-h-[44px] text-left text-sm font-semibold text-[#163B6D] underline decoration-[#163B6D]/30 underline-offset-2 transition hover:decoration-[#163B6D] focus-visible:outline focus-visible:ring-2 focus-visible:ring-[#163B6D]/35 focus-visible:ring-offset-2"
+                        >
+                          Réduction —{" "}
+                          {getDiscountLabel(
+                            discountMode,
+                            availableDiscounts,
+                            discountModeLabel
+                          )}
+                        </button>
+                      </div>
                     </div>
 
-                    <div className="rounded-2xl bg-[#FFF7EE] p-4 ring-1 ring-[#F5D1A3]">
-                      <p className="text-sm font-semibold text-[#1F2F46]">
-                        Suivi de réservation
-                      </p>
-                      <p className="mt-2 text-sm text-slate-600">
-                        Une fois confirmée, retrouvez votre réservation avec la
-                        référence et votre adresse email.
-                      </p>
-                      <a
-                        href="/retrouver-ma-reservation"
-                        className="mt-3 inline-flex text-sm font-bold text-[#163B6D] underline underline-offset-4"
+                    {/* Tablette — entre lg et xl */}
+                    <div className="hidden space-y-4 lg:block xl:hidden">
+                      <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                        <p className="text-xs font-bold uppercase text-slate-500">
+                          Options de billets
+                        </p>
+                        <div className="mt-2 max-w-md">
+                          <TripTypeToggle
+                            value={tripType}
+                            onChange={handleTripTypeChange}
+                            variant="light"
+                            buttonOrder="round_trip_first"
+                          />
+                        </div>
+                      </div>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <DesktopSearchField
+                          icon={<ShipIcon />}
+                          title="Origine"
+                          subtitle={
+                            selectedOrigin?.textoCorto || "Choisissez un port"
+                          }
+                        >
+                          <SelectionButton
+                            variant="desktop"
+                            label={
+                              selectedOrigin
+                                ? `${selectedOrigin.textoCorto} (${selectedOrigin.codigoPuerto})`
+                                : "Choisir un port de départ"
+                            }
+                            onClick={() => setSheet("origin")}
+                          />
+                        </DesktopSearchField>
+                        <DesktopSearchField
+                          icon={<ShipIcon />}
+                          title="Destination"
+                          subtitle={
+                            selectedDestination?.textoCorto ||
+                            "Choisissez une destination"
+                          }
+                        >
+                          <SelectionButton
+                            variant="desktop"
+                            label={
+                              selectedDestination
+                                ? `${selectedDestination.textoCorto} (${selectedDestination.codigoPuerto})`
+                                : "Choisir une destination"
+                            }
+                            onClick={() => setSheet("destination")}
+                          />
+                        </DesktopSearchField>
+                        <DesktopSearchField
+                          icon={<CalendarIcon />}
+                          title="Date aller"
+                          subtitle={
+                            dateIda
+                              ? formatDisplayDate(dateIda)
+                              : "Choisissez une date"
+                          }
+                        >
+                          <DateAvailabilityPicker
+                            value={dateIda}
+                            onChange={setDateIda}
+                            disabled={
+                              !origen || !destino || loadingOutboundDates
+                            }
+                            loading={loadingOutboundDates}
+                            availableDates={availableOutboundDates}
+                            placeholder="Choisissez une date"
+                            variant="desktop"
+                          />
+                        </DesktopSearchField>
+                        <DesktopSearchField
+                          icon={<CalendarIcon />}
+                          title="Date retour"
+                          subtitle={
+                            tripType === "round_trip"
+                              ? dateVuelta
+                                ? formatDisplayDate(dateVuelta)
+                                : "Choisissez une date"
+                              : "Non applicable"
+                          }
+                        >
+                          <DateAvailabilityPicker
+                            value={dateVuelta}
+                            onChange={setDateVuelta}
+                            disabled={
+                              tripType !== "round_trip" ||
+                              !origen ||
+                              !destino ||
+                              !dateIda ||
+                              loadingInboundDates
+                            }
+                            loading={loadingInboundDates}
+                            availableDates={inboundDateOptions}
+                            placeholder="Choisissez une date"
+                            minDate={dateIda || undefined}
+                            variant="desktop"
+                          />
+                        </DesktopSearchField>
+                      </div>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <DesktopSearchField
+                          icon={<UserIcon />}
+                          title="Passagers"
+                          subtitle={getPassengerSummary(passengers)}
+                        >
+                          <SelectionButton
+                            variant="desktop"
+                            label={`${totalPassengers} passager${totalPassengers > 1 ? "s" : ""}`}
+                            onClick={() => setSheet("passengers")}
+                          />
+                        </DesktopSearchField>
+                        <DesktopSearchField
+                          icon={<CarIcon />}
+                          title="Transport véhicule"
+                          subtitle={getVehicleSummary(vehicleSelections)}
+                        >
+                          <SelectionButton
+                            variant="desktop"
+                            label={getVehicleSummary(vehicleSelections)}
+                            onClick={openVehicleSheet}
+                          />
+                        </DesktopSearchField>
+                      </div>
+                      <div className="flex flex-wrap gap-3 border-t border-slate-200 pt-3">
+                        <button
+                          type="button"
+                          onClick={() => setSheet("animals")}
+                          className="min-h-[44px] rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-[#163B6D] transition hover:bg-slate-50 focus-visible:outline focus-visible:ring-2 focus-visible:ring-[#163B6D]/35 focus-visible:ring-offset-2"
+                        >
+                          Animaux : {getAnimalsSummary(animals)}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSheet("discount")}
+                          className="min-h-[44px] rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-[#163B6D] transition hover:bg-slate-50 focus-visible:outline focus-visible:ring-2 focus-visible:ring-[#163B6D]/35 focus-visible:ring-offset-2"
+                        >
+                          Réduction
+                        </button>
+                      </div>
+                      <button
+                        type="submit"
+                        disabled={!canSearch}
+                        className="inline-flex min-h-[52px] w-full items-center justify-center rounded-md bg-[#163B6D] px-5 py-4 text-base font-bold text-white shadow-sm transition hover:bg-[#0f2d55] focus-visible:outline focus-visible:ring-2 focus-visible:ring-[#163B6D]/45 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-400"
                       >
-                        Accéder au suivi
-                      </a>
+                        Rechercher
+                      </button>
                     </div>
-                  </div>
-                </>
-              )}
-            </form>
+
+                    {/* Mobile & petites largeurs */}
+                    <div className="space-y-3 lg:hidden">
+                      <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                        <p className="text-xs font-bold uppercase text-slate-500">
+                          Options de billets
+                        </p>
+                        <div className="mt-2">
+                          <TripTypeToggle
+                            value={tripType}
+                            onChange={handleTripTypeChange}
+                            variant="light"
+                            buttonOrder="round_trip_first"
+                          />
+                        </div>
+                      </div>
+
+                      <SearchCard
+                        icon={<ShipIcon />}
+                        title="Origine"
+                        subtitle={
+                          selectedOrigin?.textoCorto || "Choisissez un port"
+                        }
+                      >
+                        <SelectionButton
+                          label={
+                            selectedOrigin
+                              ? `${selectedOrigin.textoCorto} (${selectedOrigin.codigoPuerto})`
+                              : "Choisir un port de départ"
+                          }
+                          onClick={() => setSheet("origin")}
+                        />
+                      </SearchCard>
+
+                      <SearchCard
+                        icon={<ShipIcon />}
+                        title="Destination"
+                        subtitle={
+                          selectedDestination?.textoCorto ||
+                          "Choisissez une destination"
+                        }
+                      >
+                        <SelectionButton
+                          label={
+                            selectedDestination
+                              ? `${selectedDestination.textoCorto} (${selectedDestination.codigoPuerto})`
+                              : "Choisir une destination"
+                          }
+                          onClick={() => setSheet("destination")}
+                        />
+                      </SearchCard>
+
+                      <SearchCard
+                        icon={<CalendarIcon />}
+                        title="Date aller"
+                        subtitle={
+                          dateIda
+                            ? formatDisplayDate(dateIda)
+                            : "Choisissez une date"
+                        }
+                      >
+                        <DateAvailabilityPicker
+                          value={dateIda}
+                          onChange={setDateIda}
+                          disabled={!origen || !destino || loadingOutboundDates}
+                          loading={loadingOutboundDates}
+                          availableDates={availableOutboundDates}
+                          placeholder="Choisissez une date"
+                        />
+                      </SearchCard>
+
+                      <SearchCard
+                        icon={<CalendarIcon />}
+                        title="Date retour"
+                        subtitle={
+                          tripType === "round_trip"
+                            ? dateVuelta
+                              ? formatDisplayDate(dateVuelta)
+                              : "Choisissez une date"
+                            : "Non applicable"
+                        }
+                      >
+                        <DateAvailabilityPicker
+                          value={dateVuelta}
+                          onChange={setDateVuelta}
+                          disabled={
+                            tripType !== "round_trip" ||
+                            !origen ||
+                            !destino ||
+                            !dateIda ||
+                            loadingInboundDates
+                          }
+                          loading={loadingInboundDates}
+                          availableDates={inboundDateOptions}
+                          placeholder="Choisissez une date"
+                          minDate={dateIda || undefined}
+                        />
+                      </SearchCard>
+
+                      <SearchCard
+                        icon={<UserIcon />}
+                        title="Passagers"
+                        subtitle={getPassengerSummary(passengers)}
+                      >
+                        <SelectionButton
+                          label={`${totalPassengers} passager${totalPassengers > 1 ? "s" : ""}`}
+                          onClick={() => setSheet("passengers")}
+                        />
+                      </SearchCard>
+
+                      <SearchCard
+                        icon={<CarIcon />}
+                        title="Transport véhicule"
+                        subtitle={getVehicleSummary(vehicleSelections)}
+                      >
+                        <SelectionButton
+                          label={getVehicleSummary(vehicleSelections)}
+                          onClick={openVehicleSheet}
+                        />
+                      </SearchCard>
+
+                      <div className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3 sm:flex-row sm:gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setSheet("animals")}
+                          className="min-h-[48px] flex-1 rounded-md border border-slate-200 bg-white px-3 py-2.5 text-left text-sm font-semibold text-[#163B6D] transition hover:bg-slate-50 focus-visible:outline focus-visible:ring-2 focus-visible:ring-[#163B6D]/35 focus-visible:ring-offset-2"
+                        >
+                          Animaux — {getAnimalsSummary(animals)}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSheet("discount")}
+                          className="min-h-[48px] flex-1 rounded-md border border-slate-200 bg-white px-3 py-2.5 text-left text-sm font-semibold text-[#163B6D] transition hover:bg-slate-50 focus-visible:outline focus-visible:ring-2 focus-visible:ring-[#163B6D]/35 focus-visible:ring-offset-2"
+                        >
+                          Réduction —{" "}
+                          {getDiscountLabel(
+                            discountMode,
+                            availableDiscounts,
+                            discountModeLabel
+                          )}
+                        </button>
+                      </div>
+
+                      <button
+                        type="submit"
+                        disabled={!canSearch}
+                        className="inline-flex min-h-[52px] w-full max-w-full items-center justify-center rounded-md bg-[#163B6D] px-5 py-4 text-base font-bold text-white shadow-sm transition hover:bg-[#0f2d55] focus-visible:outline focus-visible:ring-2 focus-visible:ring-[#163B6D]/45 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-400"
+                      >
+                        Rechercher
+                      </button>
+                    </div>
+                  </>
+                )}
+              </form>
+            </div>
+            <p className="mx-auto mt-3 max-w-2xl px-2 text-center text-xs leading-relaxed text-white/90">
+              Tarifs et disponibilités selon les réponses du réseau — vérifiez
+              les dates proposées dans le calendrier.
+            </p>
           </div>
         </div>
       </section>
+
+      <HomePromoOffers />
 
       <ResponsivePicker
         open={sheet === "origin"}
@@ -1530,6 +2408,11 @@ export default function HomePage() {
           />
 
           <div className="space-y-3">
+            {origen && loadingDestinations ? (
+              <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                Chargement des destinations disponibles...
+              </div>
+            ) : null}
             {filteredDestinationOptions.map((port) => (
               <PickerOption
                 key={port.codigoPuerto}
@@ -1609,7 +2492,7 @@ export default function HomePage() {
               résidents non-péninsulaires et les familles nombreuses, adoptée
               dans la Loi de Finances Générale pour 2021, la réduction pour
               résidents sera indiquée et appliquée lors de la dernière étape du
-              processus d'achat, en même temps que les données de chaque
+              processus d&apos;achat, en même temps que les données de chaque
               passager.
             </p>
           </div>
@@ -1945,35 +2828,25 @@ export default function HomePage() {
         onClose={() => setSheet(null)}
       >
         <div className="space-y-3">
-          <PickerOption
-            active={discountMode === "G"}
-            title="Tarif général"
-            description="Aucune réduction particulière"
-            onClick={() => {
-              setDiscountMode("G");
-              setSheet(null);
-            }}
-          />
-
-          <PickerOption
-            active={discountMode === "R"}
-            title="Résident"
-            description="Réduction résident"
-            onClick={() => {
-              setDiscountMode("R");
-              setSheet(null);
-            }}
-          />
-
-          <PickerOption
-            active={discountMode === "F1"}
-            title="Famille nombreuse"
-            description="Réduction famille nombreuse"
-            onClick={() => {
-              setDiscountMode("F1");
-              setSheet(null);
-            }}
-          />
+          {loadingDiscounts ? (
+            <p className="text-sm text-slate-600">Chargement des bonifications Armas…</p>
+          ) : (
+            availableDiscounts.map((option) => (
+              <PickerOption
+                key={option.code}
+                active={discountMode === option.code}
+                title={option.shortLabel || fallbackDiscountLabel(option.code)}
+                description={option.longLabel || option.shortLabel || option.code}
+                onClick={() => {
+                  setDiscountMode(option.code);
+                  setDiscountModeLabel(
+                    option.shortLabel || fallbackDiscountLabel(option.code)
+                  );
+                  setSheet(null);
+                }}
+              />
+            ))
+          )}
         </div>
       </ResponsivePicker>
     </main>
