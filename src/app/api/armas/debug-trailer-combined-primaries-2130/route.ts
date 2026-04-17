@@ -262,30 +262,28 @@ export async function GET() {
         total != null &&
         linesNorm.length > 0 &&
         !(armasCodigo && /^TF/i.test(armasCodigo.trim()));
-        const salidaEntidadRaw = soapArgs.salidasEntidad?.salidaEntidad;
-        const salidaEntidad = Array.isArray(salidaEntidadRaw)
-          ? salidaEntidadRaw[0]
-          : salidaEntidadRaw;
-          
-      rows.push({
-        primaryCodigo: primary.codigoServicioVenta,
-        primaryTipo: primary.tipoServicioVenta,
-        companionCodigo: SCENARIO.companionCodigo,
-        companionTipo: SCENARIO.companionTipo,
-        presentOnSalida: ouiNon(presentOnSalida),
-        availableOnSalida: ouiNon(!!availableOnSalida),
-        armasCodigo: armasCodigo ?? null,
-        armasTexto: armasTexto ?? null,
-        total,
-        tariffError: tariffError ?? null,
-        soapArgs,
-        const salidaEntidadRaw = soapArgs.salidasEntidad?.salidaEntidad;
+
+ const salidaEntidadRaw = soapArgs.salidasEntidad?.salidaEntidad;
 const salidaEntidad = Array.isArray(salidaEntidadRaw)
   ? salidaEntidadRaw[0]
   : salidaEntidadRaw;
-        vehiculoEntidad,
-        tarificacionesNormalized: linesNorm,
-      });
+
+rows.push({
+  primaryCodigo: primary.codigoServicioVenta,
+  primaryTipo: primary.tipoServicioVenta,
+  companionCodigo: SCENARIO.companionCodigo,
+  companionTipo: SCENARIO.companionTipo,
+  presentOnSalida: ouiNon(presentOnSalida),
+  availableOnSalida: ouiNon(!!availableOnSalida),
+  armasCodigo: armasCodigo ?? null,
+  armasTexto: armasTexto ?? null,
+  total,
+  tariffError: tariffError ?? null,
+  soapArgs,
+  serviciosVentasEntidad: salidaEntidad?.serviciosVentasEntidad ?? null,
+  vehiculoEntidad,
+  tarificacionesNormalized: linesNorm,
+});
     }
 
     return NextResponse.json({
