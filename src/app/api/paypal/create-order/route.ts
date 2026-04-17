@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getBookingDraft } from "@/lib/booking-draft-store";
 
 export const dynamic = "force-dynamic";
 
 type CreateOrderBody = {
-  amount: string;
+  amount?: string;
   currency?: string;
   draftId: string;
   description?: string;
@@ -138,17 +139,44 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (!amount || Number.isNaN(Number(amount)) || Number(amount) <= 0) {
-    return NextResponse.json(
-      {
-        ok: false,
-        message: "Le montant est invalide.",
-      },
-      { status: 400 }
-    );
-  }
-
   try {
+    const draft = await getBookingDraft(draftId);
+    if (!draft) {
+      return NextResponse.json(
+        {
+          ok: false,
+          message: "Draft introuvable.",
+        },
+        { status: 404 }
+      );
+    }
+    const authoritativeAmount = String(draft.payload.total || "").trim();
+    if (
+      !authoritativeAmount ||
+      Number.isNaN(Number(authoritativeAmount)) ||
+      Number(authoritativeAmount) <= 0
+    ) {
+      return NextResponse.json(
+        {
+          ok: false,
+          message: "Montant autoritaire draft invalide.",
+        },
+        { status: 400 }
+      );
+    }
+    if (amount && Number(amount).toFixed(2) !== Number(authoritativeAmount).toFixed(2)) {
+      return NextResponse.json(
+        {
+          ok: false,
+          message:
+            "Le montant fourni par le client ne correspond pas au montant autoritaire du draft.",
+          draftAmount: Number(authoritativeAmount).toFixed(2),
+          requestedAmount: Number(amount).toFixed(2),
+        },
+        { status: 409 }
+      );
+    }
+
     const accessToken = await getPayPalAccessToken();
 
     const appUrl = getAppUrl();
@@ -167,7 +195,7 @@ export async function POST(request: NextRequest) {
           custom_id: draftId,
           amount: {
             currency_code: currency,
-            value: Number(amount).toFixed(2),
+            value: Number(authoritativeAmount).toFixed(2),
           },
         },
       ],

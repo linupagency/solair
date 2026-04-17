@@ -5,6 +5,7 @@ import type { TarificacionRequestBody } from "@/lib/armas/tarificacion-request-t
 import {
   buildNasaTarificacionesSoapArgs,
   extractNasaTarificacionesReturnMeta,
+  getFirstSalidaSoapEntity,
   type NasaTarificacionesRequestParams,
   type NasaTarificacionesSoapArgs,
 } from "@/lib/armas/client";
@@ -104,20 +105,31 @@ export function mergeProbeSoapOverrides(
 ): NasaTarificacionesSoapArgs {
   const merged = JSON.parse(JSON.stringify(base)) as NasaTarificacionesSoapArgs;
   if (!overrides) return merged;
+
   if (overrides.serviciosVentasEntidad) {
-    merged.salidasEntidad.salidaEntidad.serviciosVentasEntidad = {
-      servicioVentaEntidad: overrides.serviciosVentasEntidad
-        .servicioVentaEntidad as NasaTarificacionesSoapArgs["salidasEntidad"]["salidaEntidad"]["serviciosVentasEntidad"]["servicioVentaEntidad"],
-    };
+    const salidaEntidad = getFirstSalidaSoapEntity(
+      merged.salidasEntidad.salidaEntidad
+    );
+    if (salidaEntidad) {
+      salidaEntidad.serviciosVentasEntidad = {
+        servicioVentaEntidad:
+          overrides.serviciosVentasEntidad
+            .servicioVentaEntidad as typeof salidaEntidad.serviciosVentasEntidad.servicioVentaEntidad,
+      };
+    }
   }
+
   if (overrides.paxsVehsEntidad) {
     merged.paxsVehsEntidad = {
       ...merged.paxsVehsEntidad,
-      paxVehEntidad: overrides.paxsVehsEntidad.paxVehEntidad as NasaTarificacionesSoapArgs["paxsVehsEntidad"]["paxVehEntidad"],
+      paxVehEntidad:
+        overrides.paxsVehsEntidad.paxVehEntidad as NasaTarificacionesSoapArgs["paxsVehsEntidad"]["paxVehEntidad"],
     };
   }
+
   return merged;
 }
+  
 
 function normalizeString(v: unknown, field: string): string | { error: string } {
   if (v == null || v === "") return { error: `${field} requis.` };

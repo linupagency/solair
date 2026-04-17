@@ -3,8 +3,10 @@ import {
   createEmptyBookingFlow,
   type BookingFlow,
   type BookingJourneySegment,
+  type BookingRoundTripSelectedPricing,
   type BookingSalidaServiceOffer,
   type BookingSelectedDeparture,
+  type BookingTransportPricingCanonical,
 } from "@/lib/booking-flow";
   
   const BOOKING_FLOW_STORAGE_KEY = "solair-booking-flow";
@@ -28,6 +30,70 @@ import {
       if (Number.isFinite(parsed)) return parsed;
     }
     return fallback;
+  }
+
+  function normalizeNullableFiniteNumber(value: unknown): number | null {
+    if (value === null || typeof value === "undefined") return null;
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value === "string" && value.trim()) {
+      const parsed = Number(value.trim().replace(",", "."));
+      return Number.isFinite(parsed) ? parsed : null;
+    }
+    return null;
+  }
+
+  function normalizeTransportPricingCanonical(
+    raw: unknown
+  ): BookingTransportPricingCanonical | undefined {
+    if (!isObject(raw)) return undefined;
+    const mode = raw.pricingMode;
+    if (
+      mode !== "one_way" &&
+      mode !== "round_trip_bundle" &&
+      mode !== "round_trip_per_leg"
+    ) {
+      return undefined;
+    }
+    const totalBundleEuros = normalizeNullableFiniteNumber(raw.totalBundleEuros);
+    if (totalBundleEuros === null || totalBundleEuros <= 0) return undefined;
+    return {
+      pricingMode: mode,
+      totalBundleEuros,
+      outboundEuros: normalizeNullableFiniteNumber(raw.outboundEuros),
+      inboundEuros: normalizeNullableFiniteNumber(raw.inboundEuros),
+      segmentVentilationReliable: Boolean(raw.segmentVentilationReliable),
+    };
+  }
+
+  function normalizeRoundTripSelectedPricing(
+    raw: unknown
+  ): BookingRoundTripSelectedPricing | undefined {
+    if (!isObject(raw)) return undefined;
+    const outboundSegment = normalizeSelectedDeparture(raw.outboundSegment);
+    const inboundSegment = normalizeSelectedDeparture(raw.inboundSegment);
+    const totalEuros = normalizeNullableFiniteNumber(raw.totalEuros);
+    const serviceCode = normalizeString(raw.serviceCode);
+    const serviceType = normalizeString(raw.serviceType);
+    if (
+      !outboundSegment ||
+      !inboundSegment ||
+      totalEuros === null ||
+      totalEuros <= 0 ||
+      !serviceCode ||
+      !serviceType
+    ) {
+      return undefined;
+    }
+    return {
+      outboundSegment,
+      inboundSegment,
+      outboundEuros: normalizeNullableFiniteNumber(raw.outboundEuros),
+      inboundEuros: normalizeNullableFiniteNumber(raw.inboundEuros),
+      totalEuros,
+      serviceCode,
+      serviceType,
+      rawPricingResponse: raw.rawPricingResponse,
+    };
   }
   
   function normalizeSelectedDeparture(
@@ -68,6 +134,10 @@ import {
       .map((s) => ({
         codigoServicioVenta: normalizeString(s.codigoServicioVenta),
         tipoServicioVenta: normalizeString(s.tipoServicioVenta),
+        disponibles:
+          typeof s.disponibles === "number" && Number.isFinite(s.disponibles)
+            ? Math.floor(s.disponibles)
+            : undefined,
         textoCorto: normalizeString(s.textoCorto),
         textoLargo: normalizeString(s.textoLargo),
       }))
@@ -236,6 +306,7 @@ import {
         fechaIda: normalizeString(search.fechaIda),
         fechaVuelta: normalizeString(search.fechaVuelta),
         bonificacion: normalizeString(search.bonificacion, "G"),
+        bonificacionLabel: normalizeString(search.bonificacionLabel),
         passengers: {
           adults: normalizeNumber(passengers.adults, 1),
           youth: normalizeNumber(passengers.youth, 0),
@@ -263,13 +334,25 @@ import {
         telefono: normalizeString(contact.telefono),
       },
   
-      totals: {
-        transportOutbound: normalizeString(totals.transportOutbound),
-        transportInbound: normalizeString(totals.transportInbound),
-        accommodationOutbound: normalizeString(totals.accommodationOutbound),
-        accommodationInbound: normalizeString(totals.accommodationInbound),
-        finalTotal: normalizeString(totals.finalTotal),
-      },
+      totals: (() => {
+        const transportPricingCanonical = normalizeTransportPricingCanonical(
+          totals.transportPricingCanonical
+        );
+        const selectedRoundTripPricing = normalizeRoundTripSelectedPricing(
+          totals.selectedRoundTripPricing
+        );
+        return {
+          transportOutbound: normalizeString(totals.transportOutbound),
+          transportInbound: normalizeString(totals.transportInbound),
+          accommodationOutbound: normalizeString(totals.accommodationOutbound),
+          accommodationInbound: normalizeString(totals.accommodationInbound),
+          finalTotal: normalizeString(totals.finalTotal),
+          ...(transportPricingCanonical
+            ? { transportPricingCanonical }
+            : {}),
+          ...(selectedRoundTripPricing ? { selectedRoundTripPricing } : {}),
+        };
+      })(),
     };
   }
   

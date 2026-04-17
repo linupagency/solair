@@ -77,6 +77,7 @@ export function prepareNasaPricingCall(
   })();
 
   return {
+    requestId: input.pricingRtDebug?.requestId,
     origen: normalizeString(input.origen),
     destino: normalizeString(input.destino),
     fechaSalida: normalizeString(input.fechaSalida),
@@ -109,6 +110,19 @@ export function prepareNasaPricingCall(
           }
         : undefined,
     companionServicioVenta,
+    returnSegment: input.returnSegment
+      ? {
+          origen: normalizeString(input.returnSegment.origen),
+          destino: normalizeString(input.returnSegment.destino),
+          fechaSalida: normalizeString(input.returnSegment.fechaSalida),
+          horaSalida: normalizeString(input.returnSegment.horaSalida),
+          codigoServicioVenta: normalizeString(
+            input.returnSegment.codigoServicioVenta
+          ),
+          tipoServicioVenta: normalizeString(input.returnSegment.tipoServicioVenta),
+          sentidoSalida: input.returnSegment.sentidoSalida,
+        }
+      : undefined,
     rawTrailerLength: input.rawTrailerLength,
     pricingSoapTrace: input.pricingSoapTrace === true,
   };

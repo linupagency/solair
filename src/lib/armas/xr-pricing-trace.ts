@@ -11,8 +11,8 @@ import "server-only";
 
 import type { TarificacionRequestBody } from "@/lib/armas/tarificacion-request-types";
 import {
-  buildNasaTarificacionesSoapArgs,
   extractNasaTarificacionesReturnMeta,
+  getFirstSalidaSoapEntity,
   extractPricingVehiculoEntidad,
   type NasaTarificacionesRequestParams,
   type NasaTarificacionesSoapArgs,
@@ -99,8 +99,8 @@ export function buildXrPricingTraceRecord(
     },
     vehiculoEntidad: extractPricingVehiculoEntidad(soapArgs),
     servicioVentaEntidad:
-      soapArgs.salidasEntidad?.salidaEntidad?.serviciosVentasEntidad
-        ?.servicioVentaEntidad,
+      getFirstSalidaSoapEntity(soapArgs.salidasEntidad.salidaEntidad)
+        ?.serviciosVentasEntidad?.servicioVentaEntidad,
     armasReturn: extractNasaTarificacionesReturnMeta(rawSoapResult),
     normalizedLines: normalizeNasaTarificacionesLines(rawSoapResult),
     sumPrecioParsed: sumPrecioTotalFromNasaTarificacionesResult(rawSoapResult),

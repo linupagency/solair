@@ -30,6 +30,8 @@ export type BookingDraftSelectedDeparture = {
   destino: string;
   fechaSalida: string;
   horaSalida: string;
+  /** En aller-retour Armas, la traversée retour doit être `sentidoSalida=2`. */
+  sentidoSalida?: number;
   codigoServicioVenta: string;
   tipoServicioVenta: string;
   barco?: string;
