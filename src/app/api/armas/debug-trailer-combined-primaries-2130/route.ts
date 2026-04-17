@@ -262,7 +262,11 @@ export async function GET() {
         total != null &&
         linesNorm.length > 0 &&
         !(armasCodigo && /^TF/i.test(armasCodigo.trim()));
-
+        const salidaEntidadRaw = soapArgs.salidasEntidad?.salidaEntidad;
+        const salidaEntidad = Array.isArray(salidaEntidadRaw)
+          ? salidaEntidadRaw[0]
+          : salidaEntidadRaw;
+          
       rows.push({
         primaryCodigo: primary.codigoServicioVenta,
         primaryTipo: primary.tipoServicioVenta,
@@ -275,8 +279,10 @@ export async function GET() {
         total,
         tariffError: tariffError ?? null,
         soapArgs,
-        serviciosVentasEntidad:
-          soapArgs.salidasEntidad.salidaEntidad.serviciosVentasEntidad,
+        const salidaEntidadRaw = soapArgs.salidasEntidad?.salidaEntidad;
+const salidaEntidad = Array.isArray(salidaEntidadRaw)
+  ? salidaEntidadRaw[0]
+  : salidaEntidadRaw;
         vehiculoEntidad,
         tarificacionesNormalized: linesNorm,
       });
