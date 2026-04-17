@@ -4,6 +4,7 @@ import {
   Suspense,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -23,6 +24,7 @@ import {
   type BookingFlow,
   type BookingSalidaServiceOffer,
   type BookingSelectedDeparture,
+  type BookingTransportPricingCanonical,
   type BookingVehicleSelection,
 } from "@/lib/booking-flow";
 import {
@@ -34,6 +36,7 @@ import {
 } from "@/lib/armas/pricing-combined-flow";
 import { tryBuildTarificacionPostBodyFromFlow } from "@/lib/armas/tarificacion-post-body";
 import { fetchTransportPricing } from "@/lib/armas/transport-pricing-client";
+import { isArmasRtPricingDebugEnabled } from "@/lib/armas/rt-pricing-debug";
 import {
   isXrTraceTargetCategory,
   xrPricingTraceEnabled,
@@ -109,6 +112,12 @@ type PricingLine = {
   precioEntidad?: {
     total?: number | string;
   };
+  precioIdaEntidad?: {
+    total?: number | string;
+  };
+  precioVtaEntidad?: {
+    total?: number | string;
+  };
   tarifaEntidad?: {
     codigoTarifa?: string;
     textoCorto?: string;
@@ -128,6 +137,47 @@ type SelectedChoice = {
   salida: Salida;
   service: ServiceVente;
 };
+
+type SelectedRoundTripTotalsState = {
+  outbound: number | null;
+  inbound: number | null;
+  bundleTotal: number;
+  segmentVentilationReliable: boolean;
+  outboundMatchKey: string;
+  inboundMatchKey: string;
+  outboundMatchParts: PricingMatchParts;
+  inboundMatchParts: PricingMatchParts;
+  rawPricingResponse?: unknown;
+};
+
+type PricingMatchParts = {
+  direction: string;
+  fechaSalida: string;
+  horaSalida: string;
+  horaLlegada: string;
+  barcoCodigo: string;
+  barcoNombre: string;
+  salidaSegment: string;
+  codigoServicioVenta: string;
+  tipoServicioVenta: string;
+  vehicleSegment: string;
+};
+
+type PricingRawParts = {
+  direction: string;
+  fechaSalida: string;
+  horaSalida: string;
+  horaLlegada: string;
+  barcoCodigo: string;
+  barcoNombre: string;
+  salidaSegment: string;
+  codigoServicioVenta: string;
+  tipoServicioVenta: string;
+  vehicleSegment: string;
+};
+
+const ROUND_TRIP_CARD_NEUTRAL_PRICE_LABEL =
+  "Tarif calculé après sélection de l'aller et du retour";
 
 function normalizeArray<T>(value?: T[] | T): T[] {
   if (!value) return [];
@@ -194,7 +244,9 @@ function formatDurationFromTimes(horaSalida?: string, horaLlegada?: string) {
   return `${h} h ${String(m).padStart(2, "0")}`;
 }
 
-function discountLabel(code: string) {
+function discountLabel(code: string, apiLabel?: string) {
+  if (apiLabel?.trim()) return apiLabel.trim();
+
   switch (code) {
     case "G":
       return "Tarif général";
@@ -257,6 +309,14 @@ function getDirectionSubtitle(direction: JourneyDirection, flow: BookingFlow) {
   return `${flow.search.destino} → ${flow.search.origen}`;
 }
 
+function getSalidaOrigenCode(salida: Salida): string {
+  return String(salida.trayectoEntidad?.puertoOrigenEntidad?.codigoPuerto || "").trim();
+}
+
+function getSalidaDestinoCode(salida: Salida): string {
+  return String(salida.trayectoEntidad?.puertoDestinoEntidad?.codigoPuerto || "").trim();
+}
+
 /** Suffixe de clé tarif : distingue VR / XR / … sur la même salida et le même service passager. */
 function pricingMapVehicleSegment(flow: BookingFlow): string {
   if (!dossierHasVehicle(flow)) return "";
@@ -274,21 +334,121 @@ function pricingSalidaInstanceSegment(salida: Salida): string {
   return nombreBarco ? nombreBarco.replace(/\|/g, "_") : "";
 }
 
+function normalizePricingField(value: string): string {
+  return String(value || "").trim().replace(/\s+/g, " ").toUpperCase();
+}
+
+function buildDebugSegmentKey(input: {
+  origen: string;
+  destino: string;
+  fechaSalida: string;
+  horaSalida: string;
+  barco?: string;
+  serviceCode?: string;
+  serviceType?: string;
+}) {
+  return [
+    normalizePricingField(input.origen),
+    normalizePricingField(input.destino),
+    normalizePricingField(input.fechaSalida),
+    normalizePricingField(input.horaSalida),
+    "",
+    normalizePricingField(input.serviceCode || ""),
+    normalizePricingField(input.serviceType || ""),
+  ].join("|");
+}
+
+function buildPricingMatchParts(
+  direction: JourneyDirection,
+  salida: Salida,
+  service: ServiceVente,
+  flow: BookingFlow
+): PricingMatchParts {
+  return {
+    direction: normalizePricingField(direction),
+    fechaSalida: normalizePricingField(String(salida.fechaSalida || "")),
+    horaSalida: normalizePricingField(String(salida.horaSalida || "")),
+    horaLlegada: normalizePricingField(String(salida.horaLlegada || "")),
+    barcoCodigo: normalizePricingField(String(salida.barcoEntidad?.codigoBarco || "")),
+    barcoNombre: normalizePricingField(String(salida.barcoEntidad?.textoCorto || "")),
+    salidaSegment: normalizePricingField(pricingSalidaInstanceSegment(salida)),
+    codigoServicioVenta: normalizePricingField(
+      String(service.codigoServicioVenta || "")
+    ),
+    tipoServicioVenta: normalizePricingField(String(service.tipoServicioVenta || "")),
+    vehicleSegment: normalizePricingField(pricingMapVehicleSegment(flow)),
+  };
+}
+
+function buildPricingRawParts(
+  direction: JourneyDirection,
+  salida: Salida,
+  service: ServiceVente,
+  flow: BookingFlow
+): PricingRawParts {
+  return {
+    direction: String(direction || ""),
+    fechaSalida: String(salida.fechaSalida || ""),
+    horaSalida: String(salida.horaSalida || ""),
+    horaLlegada: String(salida.horaLlegada || ""),
+    barcoCodigo: String(salida.barcoEntidad?.codigoBarco || ""),
+    barcoNombre: String(salida.barcoEntidad?.textoCorto || ""),
+    salidaSegment: pricingSalidaInstanceSegment(salida),
+    codigoServicioVenta: String(service.codigoServicioVenta || ""),
+    tipoServicioVenta: String(service.tipoServicioVenta || ""),
+    vehicleSegment: pricingMapVehicleSegment(flow),
+  };
+}
+
+function pricingPartsToKey(parts: PricingMatchParts): string {
+  return [
+    parts.direction,
+    parts.fechaSalida,
+    parts.horaSalida,
+    parts.salidaSegment,
+    parts.codigoServicioVenta,
+    parts.tipoServicioVenta,
+    parts.vehicleSegment,
+  ].join("|");
+}
+
+function diffPricingParts(expected: PricingMatchParts, actual: PricingMatchParts) {
+  const fields = Object.keys(expected) as Array<keyof PricingMatchParts>;
+  return fields
+    .filter((f) => expected[f] !== actual[f])
+    .map((f) => ({
+      field: f,
+      expected: expected[f],
+      actual: actual[f],
+    }));
+}
+
+function isRobustPricingPartsMatch(
+  expected: PricingMatchParts,
+  actual: PricingMatchParts
+): boolean {
+  const baseEqual =
+    expected.direction === actual.direction &&
+    expected.fechaSalida === actual.fechaSalida &&
+    expected.horaSalida === actual.horaSalida &&
+    expected.codigoServicioVenta === actual.codigoServicioVenta &&
+    expected.tipoServicioVenta === actual.tipoServicioVenta &&
+    expected.vehicleSegment === actual.vehicleSegment;
+  if (!baseEqual) return false;
+  // Bateau: si code dispo des deux côtés -> code strict, sinon fallback nom.
+  if (expected.barcoCodigo && actual.barcoCodigo) {
+    return expected.barcoCodigo === actual.barcoCodigo;
+  }
+  return !!expected.barcoNombre && expected.barcoNombre === actual.barcoNombre;
+}
+
 function getPricingKey(
   direction: JourneyDirection,
   salida: Salida,
   service: ServiceVente,
   flow: BookingFlow
 ) {
-  return [
-    direction,
-    salida.fechaSalida || "",
-    salida.horaSalida || "",
-    pricingSalidaInstanceSegment(salida),
-    service.codigoServicioVenta || "",
-    service.tipoServicioVenta || "",
-    pricingMapVehicleSegment(flow),
-  ].join("|");
+  return pricingPartsToKey(buildPricingMatchParts(direction, salida, service, flow));
 }
 
 const PASSENGER_TRANSPORT_CODES = new Set(["BY", "BP", "P", "Q"]);
@@ -517,6 +677,21 @@ function parsePricingTotalEuros(total?: string): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+function roundEuros(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+function parseSoapPriceTotal(value: unknown): number | null {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : null;
+  }
+  if (typeof value === "string") {
+    const n = Number(value.trim().replace(",", "."));
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
+}
+
 function isSameChoice(
   selected: SelectedChoice | null,
   direction: JourneyDirection,
@@ -596,6 +771,11 @@ function extractOffersFromSalida(salida: Salida): BookingSalidaServiceOffer[] {
     .map((service) => ({
       codigoServicioVenta: service.codigoServicioVenta || "",
       tipoServicioVenta: service.tipoServicioVenta || "",
+      disponibles:
+        typeof service.disponibles === "number" &&
+        Number.isFinite(service.disponibles)
+          ? Math.floor(service.disponibles)
+          : undefined,
       textoCorto: service.textoCorto,
       textoLargo: service.textoLargo,
     }));
@@ -619,6 +799,11 @@ function extractEligibleOffersFromSalida(
     .map((service) => ({
       codigoServicioVenta: service.codigoServicioVenta || "",
       tipoServicioVenta: service.tipoServicioVenta || "",
+      disponibles:
+        typeof service.disponibles === "number" &&
+        Number.isFinite(service.disponibles)
+          ? Math.floor(service.disponibles)
+          : undefined,
       textoCorto: service.textoCorto,
       textoLargo: service.textoLargo,
     }));
@@ -656,7 +841,7 @@ function SectionCard({
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_10px_28px_rgba(15,23,42,0.05)] sm:p-6">
+    <section className="solair-panel p-5 sm:p-6">
       <div className="mb-5">
         <h2 className="text-xl font-bold text-slate-900">{title}</h2>
         {subtitle ? (
@@ -833,6 +1018,9 @@ function ResultatsPageContent() {
   const [selectedInbound, setSelectedInbound] = useState<SelectedChoice | null>(
     null
   );
+  const [selectedRoundTripTotals, setSelectedRoundTripTotals] =
+    useState<SelectedRoundTripTotalsState | null>(null);
+  const selectedRoundTripRequestSeq = useRef(0);
 
   const [pricingMap, setPricingMap] = useState<Record<string, PricingState>>({});
 
@@ -1081,6 +1269,42 @@ function ResultatsPageContent() {
 
       const totalVehicles = totalVehiclesBooked(flow);
       const primaryPassengerType = getPrimaryPassengerType(flow.search.passengers);
+      const tiposList = expandPassengerTipoList(flow.search.passengers);
+
+      const inboundPartnerOk =
+        flow.tripType === "round_trip" && selectedInbound
+          ? tryBuildTarificacionPostBodyFromFlow(
+              flow,
+              {
+                origen: flow.search.destino,
+                destino: flow.search.origen,
+                fechaSalida: String(
+                  selectedInbound.salida.fechaSalida || ""
+                ).trim(),
+                horaSalida: String(
+                  selectedInbound.salida.horaSalida || ""
+                ).trim(),
+              },
+              {
+                cantidad: totalPassengers,
+                codigoServicioVenta: String(
+                  selectedInbound.service.codigoServicioVenta || ""
+                ).trim(),
+                tipoServicioVenta: String(
+                  selectedInbound.service.tipoServicioVenta || ""
+                ).trim(),
+                tipoPasajero: primaryPassengerType,
+                passengerTipos: tiposList,
+              },
+              {
+                serviciosVentas: getAllSalidaServiciosWithCodes(
+                  selectedInbound.salida
+                ),
+              }
+            )
+          : null;
+      const inboundPartner =
+        inboundPartnerOk && inboundPartnerOk.ok ? inboundPartnerOk : null;
 
       const results = await Promise.all(
         pricingJobs.map(async ({ key, direction, salida, service }) => {
@@ -1097,7 +1321,6 @@ function ResultatsPageContent() {
             direction === "outbound" ? flow.search.destino : flow.search.origen;
 
           try {
-            const tiposList = expandPassengerTipoList(flow.search.passengers);
             const built = tryBuildTarificacionPostBodyFromFlow(
               flow,
               {
@@ -1123,6 +1346,161 @@ function ResultatsPageContent() {
                   note: built.error,
                 } satisfies PricingState,
               ] as const;
+            }
+
+            const pricingBody = built.body;
+            const pricingVehicle = built.normalizedVehicle;
+            let fetchOpts:
+              | {
+                  requestId?: string;
+                  tripType: "round_trip";
+                  armasLeg: "outbound" | "inbound";
+                  selectedOutboundSegment?: {
+                    origen: string;
+                    destino: string;
+                    fechaSalida: string;
+                    horaSalida: string;
+                    barco?: string;
+                    serviceCode?: string;
+                    serviceType?: string;
+                    segmentKey?: string;
+                  };
+                  selectedInboundSegment?: {
+                    origen: string;
+                    destino: string;
+                    fechaSalida: string;
+                    horaSalida: string;
+                    barco?: string;
+                    serviceCode?: string;
+                    serviceType?: string;
+                    segmentKey?: string;
+                  };
+                  returnSegment?: {
+                    origen: string;
+                    destino: string;
+                    fechaSalida: string;
+                    horaSalida: string;
+                    codigoServicioVenta: string;
+                    tipoServicioVenta: string;
+                    sentidoSalida: 2;
+                  };
+                }
+              | undefined =
+              flow.tripType === "round_trip"
+                ? {
+                    requestId: `rt-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+                    tripType: "round_trip",
+                    armasLeg: direction === "outbound" ? "outbound" : "inbound",
+                    selectedOutboundSegment: selectedOutbound
+                      ? {
+                          origen: getSalidaOrigenCode(selectedOutbound.salida),
+                          destino: getSalidaDestinoCode(selectedOutbound.salida),
+                          fechaSalida: String(
+                            selectedOutbound.salida.fechaSalida || ""
+                          ).trim(),
+                          horaSalida: String(
+                            selectedOutbound.salida.horaSalida || ""
+                          ).trim(),
+                          barco: String(
+                            selectedOutbound.salida.barcoEntidad?.codigoBarco ||
+                              selectedOutbound.salida.barcoEntidad?.textoCorto ||
+                              ""
+                          ).trim(),
+                          serviceCode: String(
+                            selectedOutbound.service.codigoServicioVenta || ""
+                          ).trim(),
+                          serviceType: String(
+                            selectedOutbound.service.tipoServicioVenta || ""
+                          ).trim(),
+                          segmentKey: buildDebugSegmentKey({
+                            origen: getSalidaOrigenCode(selectedOutbound.salida),
+                            destino: getSalidaDestinoCode(selectedOutbound.salida),
+                            fechaSalida: String(
+                              selectedOutbound.salida.fechaSalida || ""
+                            ).trim(),
+                            horaSalida: String(
+                              selectedOutbound.salida.horaSalida || ""
+                            ).trim(),
+                            barco: String(
+                              selectedOutbound.salida.barcoEntidad?.codigoBarco ||
+                                selectedOutbound.salida.barcoEntidad?.textoCorto ||
+                                ""
+                            ).trim(),
+                            serviceCode: String(
+                              selectedOutbound.service.codigoServicioVenta || ""
+                            ).trim(),
+                            serviceType: String(
+                              selectedOutbound.service.tipoServicioVenta || ""
+                            ).trim(),
+                          }),
+                        }
+                      : undefined,
+                    selectedInboundSegment: selectedInbound
+                      ? {
+                          origen: getSalidaOrigenCode(selectedInbound.salida),
+                          destino: getSalidaDestinoCode(selectedInbound.salida),
+                          fechaSalida: String(
+                            selectedInbound.salida.fechaSalida || ""
+                          ).trim(),
+                          horaSalida: String(
+                            selectedInbound.salida.horaSalida || ""
+                          ).trim(),
+                          barco: String(
+                            selectedInbound.salida.barcoEntidad?.codigoBarco ||
+                              selectedInbound.salida.barcoEntidad?.textoCorto ||
+                              ""
+                          ).trim(),
+                          serviceCode: String(
+                            selectedInbound.service.codigoServicioVenta || ""
+                          ).trim(),
+                          serviceType: String(
+                            selectedInbound.service.tipoServicioVenta || ""
+                          ).trim(),
+                          segmentKey: buildDebugSegmentKey({
+                            origen: getSalidaOrigenCode(selectedInbound.salida),
+                            destino: getSalidaDestinoCode(selectedInbound.salida),
+                            fechaSalida: String(
+                              selectedInbound.salida.fechaSalida || ""
+                            ).trim(),
+                            horaSalida: String(
+                              selectedInbound.salida.horaSalida || ""
+                            ).trim(),
+                            barco: String(
+                              selectedInbound.salida.barcoEntidad?.codigoBarco ||
+                                selectedInbound.salida.barcoEntidad?.textoCorto ||
+                                ""
+                            ).trim(),
+                            serviceCode: String(
+                              selectedInbound.service.codigoServicioVenta || ""
+                            ).trim(),
+                            serviceType: String(
+                              selectedInbound.service.tipoServicioVenta || ""
+                            ).trim(),
+                          }),
+                        }
+                      : undefined,
+                  }
+                : undefined;
+
+            if (flow.tripType === "round_trip") {
+              if (direction === "outbound" && inboundPartner) {
+                fetchOpts = {
+                  ...(fetchOpts ?? {
+                    tripType: "round_trip" as const,
+                    armasLeg: "outbound" as const,
+                  }),
+                  armasLeg: "outbound",
+                  returnSegment: {
+                    origen: inboundPartner.body.origen,
+                    destino: inboundPartner.body.destino,
+                    fechaSalida: inboundPartner.body.fechaSalida,
+                    horaSalida: inboundPartner.body.horaSalida,
+                    codigoServicioVenta: inboundPartner.body.codigoServicioVenta,
+                    tipoServicioVenta: inboundPartner.body.tipoServicioVenta,
+                    sentidoSalida: 2,
+                  },
+                };
+              }
             }
 
             if (shouldLogXrClientTrace(flow)) {
@@ -1152,15 +1530,18 @@ function ResultatsPageContent() {
             }
 
             const priced = await fetchTransportPricing(
-              built.body,
-              built.normalizedVehicle,
-              flow.tripType === "round_trip"
-                ? {
-                    tripType: "round_trip",
-                    armasLeg:
-                      direction === "outbound" ? "outbound" : "inbound",
-                  }
-                : undefined
+              pricingBody,
+              pricingVehicle,
+              {
+                ...fetchOpts,
+                debugSelectionContext: {
+                  serviceCode: codigoServicioVenta,
+                  serviceType: tipoServicioVenta,
+                  accommodationOrServiceLabel:
+                    String(service.textoCorto || service.textoLargo || "").trim() ||
+                    undefined,
+                },
+              }
             );
             if (!priced.ok) {
               return [
@@ -1168,6 +1549,59 @@ function ResultatsPageContent() {
                 {
                   status: "error",
                   note: priced.error,
+                } satisfies PricingState,
+              ] as const;
+            }
+
+            const strictRoundTripPairSelected =
+              flow.tripType === "round_trip" &&
+              !!selectedOutbound &&
+              !!selectedInbound;
+
+            let totalForCard = priced.totalFormatted;
+            let pricingNote =
+              totalVehicles > 0 || flow.search.animals.count > 0
+                ? "Prix recalculé sur la base du dossier courant."
+                : "Prix recalculé sur la base des passagers.";
+            if (fetchOpts?.returnSegment) {
+              if (priced.segmentVentilationReliable === true) {
+                const legEuros =
+                  direction === "outbound"
+                    ? priced.outboundEuros
+                    : priced.returnEuros;
+                if (
+                  legEuros == null ||
+                  !Number.isFinite(legEuros) ||
+                  legEuros <= 0
+                ) {
+                  return [
+                    key,
+                    {
+                      status: "error",
+                      note:
+                        "Réponse Armas : montant du segment courant introuvable pour cette offre.",
+                    } satisfies PricingState,
+                  ] as const;
+                }
+                totalForCard = `${legEuros.toFixed(2).replace(".", ",")} €`;
+              } else {
+                pricingNote =
+                  "Forfait aller-retour Armas calculé sur la base du dossier courant.";
+              }
+            }
+
+            if (
+              strictRoundTripPairSelected &&
+              priced.segmentVentilationReliable === true &&
+              (priced.armasVtaSubtotalEuros == null ||
+                priced.armasIdaSubtotalEuros == null)
+            ) {
+              return [
+                key,
+                {
+                  status: "error",
+                  note:
+                    "Réponse Armas AR incomplète: blocs ida/vta absents pour cette offre.",
                 } satisfies PricingState,
               ] as const;
             }
@@ -1200,12 +1634,9 @@ function ResultatsPageContent() {
               key,
               {
                 status: "success",
-                total: priced.totalFormatted,
+                total: totalForCard,
                 tarifa: first?.tarifaEntidad?.textoCorto || undefined,
-                note:
-                  totalVehicles > 0 || flow.search.animals.count > 0
-                    ? "Prix recalculé sur la base du dossier courant."
-                    : "Prix recalculé sur la base des passagers.",
+                note: pricingNote,
                 raw: first,
               } satisfies PricingState,
             ] as const;
@@ -1245,7 +1676,354 @@ function ResultatsPageContent() {
     error,
     outboundDeparturesFiltered,
     inboundDeparturesFiltered,
+    selectedOutbound,
+    selectedInbound,
   ]);
+
+  async function fetchSelectedRoundTripTotalsForChoices(
+    outboundChoice: SelectedChoice,
+    inboundChoice: SelectedChoice
+  ): Promise<SelectedRoundTripTotalsState | null> {
+    if (!flow || flow.tripType !== "round_trip") return null;
+
+    const totalPassengers = getTotalPassengers(flow);
+    if (totalPassengers <= 0) return null;
+
+    const primaryPassengerType = getPrimaryPassengerType(flow.search.passengers);
+    const tiposList = expandPassengerTipoList(flow.search.passengers);
+
+    const outBuilt = tryBuildTarificacionPostBodyFromFlow(
+      flow,
+      {
+        origen: flow.search.origen,
+        destino: flow.search.destino,
+        fechaSalida: String(outboundChoice.salida.fechaSalida || "").trim(),
+        horaSalida: String(outboundChoice.salida.horaSalida || "").trim(),
+      },
+      {
+        cantidad: totalPassengers,
+        codigoServicioVenta: String(
+          outboundChoice.service.codigoServicioVenta || ""
+        ).trim(),
+        tipoServicioVenta: String(
+          outboundChoice.service.tipoServicioVenta || ""
+        ).trim(),
+        tipoPasajero: primaryPassengerType,
+        passengerTipos: tiposList,
+      },
+      { serviciosVentas: getAllSalidaServiciosWithCodes(outboundChoice.salida) }
+    );
+    if (!outBuilt.ok) return null;
+
+    const inBuilt = tryBuildTarificacionPostBodyFromFlow(
+      flow,
+      {
+        origen: flow.search.destino,
+        destino: flow.search.origen,
+        fechaSalida: String(inboundChoice.salida.fechaSalida || "").trim(),
+        horaSalida: String(inboundChoice.salida.horaSalida || "").trim(),
+      },
+      {
+        cantidad: totalPassengers,
+        codigoServicioVenta: String(
+          inboundChoice.service.codigoServicioVenta || ""
+        ).trim(),
+        tipoServicioVenta: String(
+          inboundChoice.service.tipoServicioVenta || ""
+        ).trim(),
+        tipoPasajero: primaryPassengerType,
+        passengerTipos: tiposList,
+      },
+      { serviciosVentas: getAllSalidaServiciosWithCodes(inboundChoice.salida) }
+    );
+    if (!inBuilt.ok) return null;
+
+    const priced = await fetchTransportPricing(
+      outBuilt.body,
+      outBuilt.normalizedVehicle,
+      {
+        requestId: `rt-selected-${Date.now()}-${Math.random()
+          .toString(36)
+          .slice(2, 10)}`,
+        tripType: "round_trip",
+        armasLeg: "outbound",
+        selectedOutboundSegment: {
+          origen: outBuilt.body.origen,
+          destino: outBuilt.body.destino,
+          fechaSalida: outBuilt.body.fechaSalida,
+          horaSalida: outBuilt.body.horaSalida,
+          barco: String(
+            outboundChoice.salida.barcoEntidad?.codigoBarco ||
+              outboundChoice.salida.barcoEntidad?.textoCorto ||
+              ""
+          ).trim(),
+          serviceCode: outBuilt.body.codigoServicioVenta,
+          serviceType: outBuilt.body.tipoServicioVenta,
+          segmentKey: buildDebugSegmentKey({
+            origen: outBuilt.body.origen,
+            destino: outBuilt.body.destino,
+            fechaSalida: outBuilt.body.fechaSalida,
+            horaSalida: outBuilt.body.horaSalida,
+            barco: String(
+              outboundChoice.salida.barcoEntidad?.codigoBarco ||
+                outboundChoice.salida.barcoEntidad?.textoCorto ||
+                ""
+            ).trim(),
+            serviceCode: outBuilt.body.codigoServicioVenta,
+            serviceType: outBuilt.body.tipoServicioVenta,
+          }),
+        },
+        selectedInboundSegment: {
+          origen: inBuilt.body.origen,
+          destino: inBuilt.body.destino,
+          fechaSalida: inBuilt.body.fechaSalida,
+          horaSalida: inBuilt.body.horaSalida,
+          barco: String(
+            inboundChoice.salida.barcoEntidad?.codigoBarco ||
+              inboundChoice.salida.barcoEntidad?.textoCorto ||
+              ""
+          ).trim(),
+          serviceCode: inBuilt.body.codigoServicioVenta,
+          serviceType: inBuilt.body.tipoServicioVenta,
+          segmentKey: buildDebugSegmentKey({
+            origen: inBuilt.body.origen,
+            destino: inBuilt.body.destino,
+            fechaSalida: inBuilt.body.fechaSalida,
+            horaSalida: inBuilt.body.horaSalida,
+            barco: String(
+              inboundChoice.salida.barcoEntidad?.codigoBarco ||
+                inboundChoice.salida.barcoEntidad?.textoCorto ||
+                ""
+            ).trim(),
+            serviceCode: inBuilt.body.codigoServicioVenta,
+            serviceType: inBuilt.body.tipoServicioVenta,
+          }),
+        },
+        returnSegment: {
+          origen: inBuilt.body.origen,
+          destino: inBuilt.body.destino,
+          fechaSalida: inBuilt.body.fechaSalida,
+          horaSalida: inBuilt.body.horaSalida,
+          codigoServicioVenta: inBuilt.body.codigoServicioVenta,
+          tipoServicioVenta: inBuilt.body.tipoServicioVenta,
+          sentidoSalida: 2,
+        },
+        debugSelectionContext: {
+          serviceCode: outBuilt.body.codigoServicioVenta,
+          serviceType: outBuilt.body.tipoServicioVenta,
+          accommodationOrServiceLabel: "selected_round_trip_pair",
+        },
+      }
+    );
+    if (!priced.ok) return null;
+
+    const bundleRaw = priced.roundTripTotalEuros ?? priced.totalEuros;
+    if (bundleRaw == null || !Number.isFinite(bundleRaw) || bundleRaw <= 0) {
+      return null;
+    }
+
+    const segmentVentilationReliable = priced.segmentVentilationReliable === true;
+    if (segmentVentilationReliable) {
+      const o = priced.outboundEuros;
+      const i = priced.returnEuros;
+      if (
+        o == null ||
+        i == null ||
+        !Number.isFinite(o) ||
+        !Number.isFinite(i) ||
+        o <= 0 ||
+        i <= 0
+      ) {
+        return null;
+      }
+    }
+
+    const outboundMatchParts = buildPricingMatchParts(
+      "outbound",
+      outboundChoice.salida,
+      outboundChoice.service,
+      flow
+    );
+    const inboundMatchParts = buildPricingMatchParts(
+      "inbound",
+      inboundChoice.salida,
+      inboundChoice.service,
+      flow
+    );
+    const outboundMatchKey = pricingPartsToKey(outboundMatchParts);
+    const inboundMatchKey = pricingPartsToKey(inboundMatchParts);
+
+    if (isArmasRtPricingDebugEnabled()) {
+      const outboundRawParts = buildPricingRawParts(
+        "outbound",
+        outboundChoice.salida,
+        outboundChoice.service,
+        flow
+      );
+      const inboundRawParts = buildPricingRawParts(
+        "inbound",
+        inboundChoice.salida,
+        inboundChoice.service,
+        flow
+      );
+      console.info(
+        "[SOLAIR_ARMAS_RT_PRICING_DEBUG] resultats.selectedRoundTripTotals.keys",
+        JSON.stringify(
+          {
+            outboundMatchKey,
+            inboundMatchKey,
+            outboundRawParts,
+            inboundRawParts,
+            outboundMatchParts,
+            inboundMatchParts,
+          },
+          null,
+          0
+        )
+      );
+    }
+
+    return {
+      outbound: segmentVentilationReliable ? priced.outboundEuros! : null,
+      inbound: segmentVentilationReliable ? priced.returnEuros! : null,
+      bundleTotal: bundleRaw,
+      segmentVentilationReliable,
+      outboundMatchKey,
+      inboundMatchKey,
+      outboundMatchParts,
+      inboundMatchParts,
+      rawPricingResponse: priced.soapData,
+    };
+  }
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadSelectedRoundTripTotals() {
+      if (!flow || flow.tripType !== "round_trip") {
+        setSelectedRoundTripTotals(null);
+        return;
+      }
+      if (!selectedOutbound || !selectedInbound) {
+        setSelectedRoundTripTotals(null);
+        return;
+      }
+
+      const requestSeq = ++selectedRoundTripRequestSeq.current;
+      const totals = await fetchSelectedRoundTripTotalsForChoices(
+        selectedOutbound,
+        selectedInbound
+      );
+      if (cancelled || requestSeq !== selectedRoundTripRequestSeq.current) return;
+      setSelectedRoundTripTotals(totals);
+    }
+
+    void loadSelectedRoundTripTotals();
+    return () => {
+      cancelled = true;
+    };
+  }, [flow, selectedOutbound, selectedInbound]);
+
+  const selectedRoundTripTotalsFallback = useMemo(() => {
+    if (!flow || flow.tripType !== "round_trip") return null;
+    if (!selectedOutbound || !selectedInbound) return null;
+
+    const outboundKey = getPricingKey(
+      "outbound",
+      selectedOutbound.salida,
+      selectedOutbound.service,
+      flow
+    );
+    const outboundState = pricingMap[outboundKey];
+    const inboundKey = getPricingKey(
+      "inbound",
+      selectedInbound.salida,
+      selectedInbound.service,
+      flow
+    );
+    const inboundState = pricingMap[inboundKey];
+
+    const outboundMatchParts = buildPricingMatchParts(
+      "outbound",
+      selectedOutbound.salida,
+      selectedOutbound.service,
+      flow
+    );
+    const inboundMatchParts = buildPricingMatchParts(
+      "inbound",
+      selectedInbound.salida,
+      selectedInbound.service,
+      flow
+    );
+
+    if (outboundState?.status === "success" && outboundState.raw) {
+      const rawLine = outboundState.raw as PricingLine | undefined;
+      const bundleTotal = parseSoapPriceTotal(rawLine?.precioEntidad?.total);
+
+      if (
+        bundleTotal != null &&
+        Number.isFinite(bundleTotal) &&
+        bundleTotal > 0
+      ) {
+        const idaTotal = parseSoapPriceTotal(rawLine?.precioIdaEntidad?.total);
+        const vtaTotal = parseSoapPriceTotal(rawLine?.precioVtaEntidad?.total);
+        const segmentVentilationReliable =
+          idaTotal != null &&
+          vtaTotal != null &&
+          Math.abs(idaTotal + vtaTotal - bundleTotal) <= 0.03;
+
+        return {
+          outbound: segmentVentilationReliable ? idaTotal : null,
+          inbound: segmentVentilationReliable ? vtaTotal : null,
+          bundleTotal,
+          segmentVentilationReliable,
+          outboundMatchKey: pricingPartsToKey(outboundMatchParts),
+          inboundMatchKey: pricingPartsToKey(inboundMatchParts),
+          outboundMatchParts,
+          inboundMatchParts,
+          rawPricingResponse: rawLine,
+        } satisfies SelectedRoundTripTotalsState;
+      }
+    }
+
+    const outboundEuros =
+      outboundState?.status === "success"
+        ? parsePricingTotalEuros(outboundState.total)
+        : null;
+    const inboundEuros =
+      inboundState?.status === "success"
+        ? parsePricingTotalEuros(inboundState.total)
+        : null;
+
+    if (
+      outboundEuros == null ||
+      inboundEuros == null ||
+      !Number.isFinite(outboundEuros) ||
+      !Number.isFinite(inboundEuros) ||
+      outboundEuros <= 0 ||
+      inboundEuros <= 0
+    ) {
+      return null;
+    }
+
+    return {
+      outbound: outboundEuros,
+      inbound: inboundEuros,
+      bundleTotal: roundEuros(outboundEuros + inboundEuros),
+      segmentVentilationReliable: true,
+      outboundMatchKey: pricingPartsToKey(outboundMatchParts),
+      inboundMatchKey: pricingPartsToKey(inboundMatchParts),
+      outboundMatchParts,
+      inboundMatchParts,
+      rawPricingResponse: {
+        outboundPricingState: outboundState,
+        inboundPricingState: inboundState,
+      },
+    } satisfies SelectedRoundTripTotalsState;
+  }, [flow, pricingMap, selectedInbound, selectedOutbound]);
+
+  const effectiveSelectedRoundTripTotals =
+    selectedRoundTripTotals ?? selectedRoundTripTotalsFallback;
 
   const canContinue = useMemo(() => {
     if (!flow) return false;
@@ -1262,6 +2040,28 @@ function ResultatsPageContent() {
       return false;
     }
 
+    if (flow.tripType === "round_trip") {
+      if (!selectedInbound) return false;
+      if (!effectiveSelectedRoundTripTotals) return false;
+      if (effectiveSelectedRoundTripTotals.bundleTotal <= 0) return false;
+      if (effectiveSelectedRoundTripTotals.segmentVentilationReliable) {
+        const o = effectiveSelectedRoundTripTotals.outbound;
+        const i = effectiveSelectedRoundTripTotals.inbound;
+        if (o == null || i == null || o <= 0 || i <= 0) return false;
+      }
+      if (
+        vehicleAddonPricingRequiredAndMissing(
+          flow,
+          "inbound",
+          selectedInbound.salida,
+          pricingMap
+        )
+        ) {
+          return false;
+        }
+      return true;
+    }
+
     const obCombined = getCombinedTransportTotalString(
       flow,
       "outbound",
@@ -1271,33 +2071,23 @@ function ResultatsPageContent() {
     const obAmount = parsePricingTotalEuros(obCombined);
     if (obAmount === null || obAmount <= 0) return false;
 
-    if (flow.tripType === "round_trip") {
-      if (!selectedInbound) return false;
-      if (
-        vehicleAddonPricingRequiredAndMissing(
-          flow,
-          "inbound",
-          selectedInbound.salida,
-          pricingMap
-        )
-      ) {
-        return false;
-      }
-      const inCombined = getCombinedTransportTotalString(
-        flow,
-        "inbound",
-        selectedInbound,
-        pricingMap
-      );
-      const inAmount = parsePricingTotalEuros(inCombined);
-      if (inAmount === null || inAmount <= 0) return false;
-    }
-
     return true;
-  }, [flow, selectedOutbound, selectedInbound, pricingMap]);
+  }, [
+    effectiveSelectedRoundTripTotals,
+    flow,
+    selectedOutbound,
+    selectedInbound,
+    pricingMap,
+  ]);
 
   const outboundTariffOk = useMemo(() => {
     if (!flow || !selectedOutbound) return false;
+    if (flow.tripType === "round_trip") {
+      return (
+        !!effectiveSelectedRoundTripTotals &&
+        effectiveSelectedRoundTripTotals.bundleTotal > 0
+      );
+    }
     if (
       vehicleAddonPricingRequiredAndMissing(
         flow,
@@ -1316,10 +2106,13 @@ function ResultatsPageContent() {
     );
     const n = parsePricingTotalEuros(combined);
     return n !== null && n > 0;
-  }, [flow, selectedOutbound, pricingMap]);
+  }, [effectiveSelectedRoundTripTotals, flow, selectedOutbound, pricingMap]);
 
   const inboundTariffOk = useMemo(() => {
     if (!flow || !selectedInbound) return false;
+    if (flow.tripType === "round_trip" && effectiveSelectedRoundTripTotals) {
+      return effectiveSelectedRoundTripTotals.bundleTotal > 0;
+    }
     if (
       vehicleAddonPricingRequiredAndMissing(
         flow,
@@ -1338,7 +2131,7 @@ function ResultatsPageContent() {
     );
     const n = parsePricingTotalEuros(combined);
     return n !== null && n > 0;
-  }, [flow, selectedInbound, pricingMap]);
+  }, [effectiveSelectedRoundTripTotals, flow, selectedInbound, pricingMap]);
 
   const roundTripSelectionHint = useMemo(() => {
     if (!flow || flow.tripType !== "round_trip") return "";
@@ -1370,23 +2163,17 @@ function ResultatsPageContent() {
   const roundTripTransportAmounts = useMemo(() => {
     if (!flow || flow.tripType !== "round_trip") return null;
     if (!selectedOutbound || !selectedInbound) return null;
-    const obStr = getCombinedTransportTotalString(
-      flow,
-      "outbound",
-      selectedOutbound,
-      pricingMap
-    );
-    const ibStr = getCombinedTransportTotalString(
-      flow,
-      "inbound",
-      selectedInbound,
-      pricingMap
-    );
-    const ob = parsePricingTotalEuros(obStr);
-    const ib = parsePricingTotalEuros(ibStr);
-    if (ob === null || ib === null) return null;
-    return { outbound: ob, inbound: ib, total: ob + ib };
-  }, [flow, selectedOutbound, selectedInbound, pricingMap]);
+    if (effectiveSelectedRoundTripTotals) {
+      return {
+        outbound: effectiveSelectedRoundTripTotals.outbound,
+        inbound: effectiveSelectedRoundTripTotals.inbound,
+        total: effectiveSelectedRoundTripTotals.bundleTotal,
+        segmentVentilationReliable:
+          effectiveSelectedRoundTripTotals.segmentVentilationReliable,
+      };
+    }
+    return null;
+  }, [effectiveSelectedRoundTripTotals, flow, selectedOutbound, selectedInbound]);
 
   function handleSelectChoice(
     direction: JourneyDirection,
@@ -1401,10 +2188,36 @@ function ResultatsPageContent() {
 
     if (direction === "outbound") {
       setSelectedOutbound(choice);
+      if (flow?.tripType === "round_trip") {
+        if (selectedInbound) {
+          const requestSeq = ++selectedRoundTripRequestSeq.current;
+          void fetchSelectedRoundTripTotalsForChoices(choice, selectedInbound).then(
+            (totals) => {
+              if (requestSeq !== selectedRoundTripRequestSeq.current) return;
+              setSelectedRoundTripTotals(totals);
+            }
+          );
+        } else {
+          setSelectedRoundTripTotals(null);
+        }
+      }
       return;
     }
 
     setSelectedInbound(choice);
+    if (flow?.tripType === "round_trip") {
+      if (selectedOutbound) {
+        const requestSeq = ++selectedRoundTripRequestSeq.current;
+        void fetchSelectedRoundTripTotalsForChoices(selectedOutbound, choice).then(
+          (totals) => {
+            if (requestSeq !== selectedRoundTripRequestSeq.current) return;
+            setSelectedRoundTripTotals(totals);
+          }
+        );
+      } else {
+        setSelectedRoundTripTotals(null);
+      }
+    }
   }
 
   function handleContinue() {
@@ -1485,6 +2298,35 @@ function ResultatsPageContent() {
           }
         : undefined;
 
+    let transportPricingCanonical: BookingTransportPricingCanonical | undefined;
+    if (flow.tripType === "round_trip" && roundTripTransportAmounts) {
+      transportPricingCanonical = {
+        pricingMode: roundTripTransportAmounts.segmentVentilationReliable
+          ? "round_trip_per_leg"
+          : "round_trip_bundle",
+        totalBundleEuros: roundTripTransportAmounts.total,
+        outboundEuros: roundTripTransportAmounts.segmentVentilationReliable
+          ? roundTripTransportAmounts.outbound
+          : null,
+        inboundEuros: roundTripTransportAmounts.segmentVentilationReliable
+          ? roundTripTransportAmounts.inbound
+          : null,
+        segmentVentilationReliable:
+          roundTripTransportAmounts.segmentVentilationReliable,
+      };
+    } else if (flow.tripType === "one_way") {
+      const n = parsePricingTotalEuros(outboundPricingState?.total);
+      if (n !== null && n > 0) {
+        transportPricingCanonical = {
+          pricingMode: "one_way",
+          totalBundleEuros: n,
+          outboundEuros: n,
+          inboundEuros: null,
+          segmentVentilationReliable: true,
+        };
+      }
+    }
+
     const nextFlow = {
       ...flow,
       outbound: {
@@ -1524,11 +2366,46 @@ function ResultatsPageContent() {
           : undefined,
       totals: {
         ...flow.totals,
-        transportOutbound: outboundPricingState?.total || "",
+        transportPricingCanonical,
+        transportOutbound:
+          flow.tripType === "round_trip" && roundTripTransportAmounts
+            ? roundTripTransportAmounts.segmentVentilationReliable &&
+              roundTripTransportAmounts.outbound != null
+              ? formatMoney(roundTripTransportAmounts.outbound)
+              : ""
+            : outboundPricingState?.total || "",
         transportInbound:
           flow.tripType === "round_trip" && selectedInbound
-            ? inboundPricingState?.total || ""
+            ? roundTripTransportAmounts
+              ? roundTripTransportAmounts.segmentVentilationReliable &&
+                  roundTripTransportAmounts.inbound != null
+                ? formatMoney(roundTripTransportAmounts.inbound)
+                : ""
+              : inboundPricingState?.total || ""
             : "",
+        selectedRoundTripPricing:
+          flow.tripType === "round_trip" &&
+          selectedInbound &&
+          effectiveSelectedRoundTripTotals
+            ? {
+                outboundSegment: mapChoiceToBookingSelectedDeparture(
+                  selectedOutbound,
+                  outboundPricingState
+                ),
+                inboundSegment: mapChoiceToBookingSelectedDeparture(
+                  selectedInbound,
+                  inboundPricingState
+                ),
+                outboundEuros: effectiveSelectedRoundTripTotals.outbound,
+                inboundEuros: effectiveSelectedRoundTripTotals.inbound,
+                totalEuros: effectiveSelectedRoundTripTotals.bundleTotal,
+                serviceCode:
+                  String(selectedOutbound.service.codigoServicioVenta || "").trim(),
+                serviceType:
+                  String(selectedOutbound.service.tipoServicioVenta || "").trim(),
+                rawPricingResponse: effectiveSelectedRoundTripTotals.rawPricingResponse,
+              }
+            : undefined,
       },
     } satisfies BookingFlow;
 
@@ -1604,7 +2481,8 @@ function ResultatsPageContent() {
                   state == null ||
                   state.status === "loading" ||
                   state.status === "success" ||
-                  state.status === "error"
+                  state.status === "error" ||
+                  state.status === "unsupported"
                 );
               });
 
@@ -1692,9 +2570,26 @@ function ResultatsPageContent() {
                       {compatibleServices.length > 0 ? (
                         (() => {
                           function bestForKind(kind: CommercialOfferKind) {
+                            type CardBestSource =
+                              | "selected_roundtrip_reuse_exact_match"
+                              | "selected_roundtrip_bundle_exact_match"
+                              | "fallback_catalog_price"
+                              | "neutral_round_trip_quote";
+
                             let best:
-                              | { service: ServiceVente; total: string }
+                              | {
+                                  service: ServiceVente;
+                                  total: string;
+                                  source: CardBestSource;
+                                  matchedPricingKey?: string;
+                                }
                               | null = null;
+
+                            const pairReady =
+                              bookingFlow.tripType === "round_trip" &&
+                              !!selectedOutbound &&
+                              !!selectedInbound &&
+                              !!effectiveSelectedRoundTripTotals;
 
                             for (const service of compatibleServices) {
                               const commercialKind = getCommercialKind(service);
@@ -1712,18 +2607,179 @@ function ResultatsPageContent() {
                                 service,
                                 bookingFlow
                               );
+                              const cardMatchParts = buildPricingMatchParts(
+                                direction,
+                                salida,
+                                service,
+                                bookingFlow
+                              );
+                              const cardRawParts = buildPricingRawParts(
+                                direction,
+                                salida,
+                                service,
+                                bookingFlow
+                              );
                               const st = pricingMap[key];
+                              const expectedParts =
+                                bookingFlow.tripType === "round_trip" &&
+                                effectiveSelectedRoundTripTotals
+                                  ? direction === "outbound"
+                                    ? effectiveSelectedRoundTripTotals.outboundMatchParts
+                                    : effectiveSelectedRoundTripTotals.inboundMatchParts
+                                  : null;
+                              const expectedKey = expectedParts
+                                ? pricingPartsToKey(expectedParts)
+                                : null;
+                              const partsMatch =
+                                expectedParts &&
+                                isRobustPricingPartsMatch(expectedParts, cardMatchParts);
+                              const realSegmentEuros =
+                                bookingFlow.tripType === "round_trip" &&
+                                effectiveSelectedRoundTripTotals &&
+                                partsMatch
+                                  ? direction === "outbound"
+                                    ? effectiveSelectedRoundTripTotals.outbound
+                                    : effectiveSelectedRoundTripTotals.inbound
+                                  : null;
+                              const roundTripBundleEuros =
+                                bookingFlow.tripType === "round_trip" &&
+                                effectiveSelectedRoundTripTotals &&
+                                partsMatch &&
+                                effectiveSelectedRoundTripTotals.bundleTotal > 0
+                                  ? effectiveSelectedRoundTripTotals.bundleTotal
+                                  : null;
+                              const hasRealSegment =
+                                typeof realSegmentEuros === "number" &&
+                                Number.isFinite(realSegmentEuros) &&
+                                realSegmentEuros > 0;
+
+                              if (isArmasRtPricingDebugEnabled()) {
+                                console.info(
+                                  "[SOLAIR_ARMAS_RT_PRICING_DEBUG] resultats.cardMatchAudit",
+                                  JSON.stringify(
+                                    {
+                                      segment: direction,
+                                      expectedKey,
+                                      cardPricingKey: key,
+                                      matched: !!partsMatch,
+                                      diffFields:
+                                        expectedParts && cardMatchParts
+                                          ? diffPricingParts(
+                                              expectedParts,
+                                              cardMatchParts
+                                            )
+                                          : [],
+                                      expectedParts,
+                                      expectedRawParts:
+                                        direction === "outbound"
+                                          ? buildPricingRawParts(
+                                              "outbound",
+                                              selectedOutbound?.salida || salida,
+                                              selectedOutbound?.service || service,
+                                              bookingFlow
+                                            )
+                                          : buildPricingRawParts(
+                                              "inbound",
+                                              selectedInbound?.salida || salida,
+                                              selectedInbound?.service || service,
+                                              bookingFlow
+                                            ),
+                                      cardRawParts,
+                                      cardParts: cardMatchParts,
+                                    },
+                                    null,
+                                    0
+                                  )
+                                );
+                              }
+
+                              if (bookingFlow.tripType === "round_trip") {
+                                if (!pairReady) {
+                                  if (!best) {
+                                    best = {
+                                      service,
+                                      total: ROUND_TRIP_CARD_NEUTRAL_PRICE_LABEL,
+                                      source: "neutral_round_trip_quote",
+                                    };
+                                  }
+                                  continue;
+                                }
+                                if (hasRealSegment) {
+                                  const displayTotal = formatMoney(realSegmentEuros);
+                                  const n = realSegmentEuros;
+                                  if (
+                                    !best ||
+                                    best.source === "neutral_round_trip_quote"
+                                  ) {
+                                    best = {
+                                      service,
+                                      total: displayTotal,
+                                      source: "selected_roundtrip_reuse_exact_match",
+                                      matchedPricingKey: key,
+                                    };
+                                  } else if (
+                                    best.source ===
+                                    "selected_roundtrip_reuse_exact_match"
+                                  ) {
+                                    const current = eurosFromDisplay(best.total);
+                                    if (current === null || n < current) {
+                                      best = {
+                                        service,
+                                        total: displayTotal,
+                                        source: "selected_roundtrip_reuse_exact_match",
+                                        matchedPricingKey: key,
+                                      };
+                                    }
+                                  }
+                                  continue;
+                                }
+                                if (
+                                  roundTripBundleEuros != null &&
+                                  Number.isFinite(roundTripBundleEuros) &&
+                                  roundTripBundleEuros > 0
+                                ) {
+                                  best = {
+                                    service,
+                                    total: formatMoney(roundTripBundleEuros),
+                                    source: "selected_roundtrip_bundle_exact_match",
+                                    matchedPricingKey: key,
+                                  };
+                                  continue;
+                                }
+                                if (
+                                  !best ||
+                                  best.source === "neutral_round_trip_quote"
+                                ) {
+                                  if (!best) {
+                                    best = {
+                                      service,
+                                      total: ROUND_TRIP_CARD_NEUTRAL_PRICE_LABEL,
+                                      source: "neutral_round_trip_quote",
+                                    };
+                                  }
+                                }
+                                continue;
+                              }
+
                               if (st?.status !== "success") continue;
-                              const displayTotal = st.total || "";
+                              const displayTotal = st?.total || "";
                               const n = eurosFromDisplay(displayTotal);
                               if (n === null || n <= 0) continue;
                               if (!best) {
-                                best = { service, total: displayTotal };
+                                best = {
+                                  service,
+                                  total: displayTotal,
+                                  source: "fallback_catalog_price",
+                                };
                                 continue;
                               }
                               const current = eurosFromDisplay(best.total);
                               if (current === null || n < current) {
-                                best = { service, total: displayTotal };
+                                best = {
+                                  service,
+                                  total: displayTotal,
+                                  source: "fallback_catalog_price",
+                                };
                               }
                             }
                             return best;
@@ -1758,6 +2814,61 @@ function ResultatsPageContent() {
                             salida.horaLlegada
                           );
 
+                          if (isArmasRtPricingDebugEnabled()) {
+                            const boatCode = String(
+                              salida.barcoEntidad?.codigoBarco || ""
+                            ).trim();
+                            const boatName = String(
+                              salida.barcoEntidad?.textoCorto || ""
+                            ).trim();
+                            if (bestSeat) {
+                              console.info(
+                                "[SOLAIR_ARMAS_RT_PRICING_DEBUG] resultats.cardPrice",
+                                JSON.stringify(
+                                  {
+                                    segment: direction,
+                                    fechaSalida: salida.fechaSalida || "",
+                                    horaSalida: salida.horaSalida || "",
+                                    horaLlegada: salida.horaLlegada || "",
+                                    barco: boatName || null,
+                                    barcoCodigo: boatCode || null,
+                                    cardKind: "seat",
+                                    cardPricingKey: getPricingKey(direction, salida, bestSeat.service, bookingFlow),
+                                    priceSource: bestSeat.source,
+                                    displayedAmount: bestSeat.total,
+                                    matchedArmasOfferKey:
+                                      bestSeat.matchedPricingKey || null,
+                                  },
+                                  null,
+                                  0
+                                )
+                              );
+                            }
+                            if (bestCabin) {
+                              console.info(
+                                "[SOLAIR_ARMAS_RT_PRICING_DEBUG] resultats.cardPrice",
+                                JSON.stringify(
+                                  {
+                                    segment: direction,
+                                    fechaSalida: salida.fechaSalida || "",
+                                    horaSalida: salida.horaSalida || "",
+                                    horaLlegada: salida.horaLlegada || "",
+                                    barco: boatName || null,
+                                    barcoCodigo: boatCode || null,
+                                    cardKind: "cabin",
+                                    cardPricingKey: getPricingKey(direction, salida, bestCabin.service, bookingFlow),
+                                    priceSource: bestCabin.source,
+                                    displayedAmount: bestCabin.total,
+                                    matchedArmasOfferKey:
+                                      bestCabin.matchedPricingKey || null,
+                                  },
+                                  null,
+                                  0
+                                )
+                              );
+                            }
+                          }
+
                           const categoryCards: ReactNode[] = [];
 
                           if (bestSeat) {
@@ -1791,10 +2902,26 @@ function ResultatsPageContent() {
                                     </p>
                                   </div>
                                   <div className="text-right">
-                                    <p className="text-xs font-semibold uppercase tracking-wide opacity-75">
-                                      À partir de
-                                    </p>
-                                    <p className="mt-1 text-2xl font-extrabold">
+                                    {bestSeat.source !==
+                                    "neutral_round_trip_quote" ? (
+                                      <p className="text-xs font-semibold uppercase tracking-wide opacity-75">
+                                        {bestSeat.source ===
+                                        "selected_roundtrip_reuse_exact_match"
+                                          ? "Tarif dossier"
+                                          : bestSeat.source ===
+                                              "selected_roundtrip_bundle_exact_match"
+                                            ? "Forfait AR"
+                                            : "À partir de"}
+                                      </p>
+                                    ) : null}
+                                    <p
+                                      className={`mt-1 font-extrabold ${
+                                        bestSeat.source ===
+                                        "neutral_round_trip_quote"
+                                          ? "text-base leading-snug"
+                                          : "text-2xl"
+                                      }`}
+                                    >
                                       {bestSeat.total}
                                     </p>
                                   </div>
@@ -1806,6 +2933,34 @@ function ResultatsPageContent() {
                                 >
                                   {serviceLabel(bestSeat.service)}
                                 </p>
+                                {bestSeat.source ===
+                                "selected_roundtrip_reuse_exact_match" ? (
+                                  <p
+                                    className={`mt-1 text-[11px] ${
+                                      seatSelected ? "text-white/75" : "text-slate-500"
+                                    }`}
+                                  >
+                                    Tarif calculé pour votre dossier
+                                  </p>
+                                ) : bestSeat.source ===
+                                  "selected_roundtrip_bundle_exact_match" ? (
+                                  <p
+                                    className={`mt-1 text-[11px] ${
+                                      seatSelected ? "text-white/75" : "text-slate-500"
+                                    }`}
+                                  >
+                                    Total aller-retour calculé pour votre dossier Armas.
+                                  </p>
+                                ) : bestSeat.source ===
+                                  "neutral_round_trip_quote" ? (
+                                  <p
+                                    className={`mt-1 text-[11px] ${
+                                      seatSelected ? "text-white/75" : "text-slate-500"
+                                    }`}
+                                  >
+                                    Montant affiché après choix des deux traversées.
+                                  </p>
+                                ) : null}
                               </button>
                             );
                           }
@@ -1839,10 +2994,26 @@ function ResultatsPageContent() {
                                     </p>
                                   </div>
                                   <div className="text-right">
-                                    <p className="text-xs font-semibold uppercase tracking-wide opacity-75">
-                                      À partir de
-                                    </p>
-                                    <p className="mt-1 text-2xl font-extrabold">
+                                    {bestCabin.source !==
+                                    "neutral_round_trip_quote" ? (
+                                      <p className="text-xs font-semibold uppercase tracking-wide opacity-75">
+                                        {bestCabin.source ===
+                                        "selected_roundtrip_reuse_exact_match"
+                                          ? "Tarif dossier"
+                                          : bestCabin.source ===
+                                              "selected_roundtrip_bundle_exact_match"
+                                            ? "Forfait AR"
+                                            : "À partir de"}
+                                      </p>
+                                    ) : null}
+                                    <p
+                                      className={`mt-1 font-extrabold ${
+                                        bestCabin.source ===
+                                        "neutral_round_trip_quote"
+                                          ? "text-base leading-snug"
+                                          : "text-2xl"
+                                      }`}
+                                    >
                                       {bestCabin.total}
                                     </p>
                                   </div>
@@ -1854,6 +3025,34 @@ function ResultatsPageContent() {
                                 >
                                   {serviceLabel(bestCabin.service)}
                                 </p>
+                                {bestCabin.source ===
+                                "selected_roundtrip_reuse_exact_match" ? (
+                                  <p
+                                    className={`mt-1 text-[11px] ${
+                                      cabinSelected ? "text-white/75" : "text-slate-500"
+                                    }`}
+                                  >
+                                    Tarif calculé pour votre dossier
+                                  </p>
+                                ) : bestCabin.source ===
+                                  "selected_roundtrip_bundle_exact_match" ? (
+                                  <p
+                                    className={`mt-1 text-[11px] ${
+                                      cabinSelected ? "text-white/75" : "text-slate-500"
+                                    }`}
+                                  >
+                                    Total aller-retour calculé pour votre dossier Armas.
+                                  </p>
+                                ) : bestCabin.source ===
+                                  "neutral_round_trip_quote" ? (
+                                  <p
+                                    className={`mt-1 text-[11px] ${
+                                      cabinSelected ? "text-white/75" : "text-slate-500"
+                                    }`}
+                                  >
+                                    Montant affiché après choix des deux traversées.
+                                  </p>
+                                ) : null}
                               </button>
                             );
                           }
@@ -1874,9 +3073,23 @@ function ResultatsPageContent() {
                             const allError =
                               states.length > 0 &&
                               states.every((st) => st?.status === "error");
+                            const allUnsupported =
+                              states.length > 0 &&
+                              states.every((st) => st?.status === "unsupported");
                             const firstErrorNote = states.find(
                               (st) => st?.status === "error" && st.note?.trim()
                             )?.note;
+                            const firstUnsupportedNote = states.find(
+                              (st) =>
+                                st?.status === "unsupported" && st.note?.trim()
+                            )?.note;
+                            if (allUnsupported && firstUnsupportedNote) {
+                              return (
+                                <span className="text-sm text-slate-600">
+                                  {firstUnsupportedNote}
+                                </span>
+                              );
+                            }
                             if (allError && firstErrorNote) {
                               return (
                                 <span className="text-sm text-amber-900">
@@ -1953,22 +3166,22 @@ function ResultatsPageContent() {
 
   return (
     <main className="min-h-screen bg-[#F7F5F2] text-slate-900">
-      <section className="bg-[#163B6D] pb-8 pt-5">
-        <div className="mx-auto max-w-7xl px-4">
-          <div className="mb-5 flex flex-wrap items-center gap-2">
-            <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-[#163B6D]">
+      <section className="solair-hero pb-8 pt-5">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6">
+          <div className="solair-stepbar mb-5">
+            <span className="solair-stepchip solair-stepchip--done">
               1. Recherche
             </span>
-            <span className="rounded-full bg-[#F28C28] px-3 py-1 text-xs font-semibold text-white">
+            <span className="solair-stepchip solair-stepchip--active">
               2. Traversées et prix
             </span>
-            <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-semibold text-white">
+            <span className="solair-stepchip solair-stepchip--pending">
               3. Hébergement
             </span>
-            <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-semibold text-white">
+            <span className="solair-stepchip solair-stepchip--pending">
               4. Passager
             </span>
-            <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-semibold text-white">
+            <span className="solair-stepchip solair-stepchip--pending">
               5. Récapitulatif
             </span>
           </div>
@@ -1987,7 +3200,7 @@ function ResultatsPageContent() {
             <button
               type="button"
               onClick={() => router.push("/")}
-              className="inline-flex rounded-2xl border border-white/20 bg-white/10 px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/20"
+              className="solair-secondary-btn inline-flex justify-center px-4 py-3 text-sm font-semibold"
             >
               Nouvelle recherche
             </button>
@@ -2038,7 +3251,10 @@ function ResultatsPageContent() {
                         Réduction
                       </p>
                       <p className="mt-2 text-sm font-semibold text-slate-900">
-                        {discountLabel(flow.search.bonificacion)}
+                        {discountLabel(
+                          flow.search.bonificacion,
+                          flow.search.bonificacionLabel
+                        )}
                       </p>
                     </div>
                   </div>
@@ -2136,22 +3352,37 @@ function ResultatsPageContent() {
                           Transport sélectionné
                         </p>
                         <div className="mt-2 space-y-1">
-                          <div className="flex justify-between gap-3">
-                            <span>Aller</span>
-                            <span className="font-semibold text-slate-900">
-                              {formatMoney(roundTripTransportAmounts.outbound)}
-                            </span>
-                          </div>
-                          <div className="flex justify-between gap-3">
-                            <span>Retour</span>
-                            <span className="font-semibold text-slate-900">
-                              {formatMoney(roundTripTransportAmounts.inbound)}
-                            </span>
-                          </div>
-                          <div className="flex justify-between gap-3 border-t border-slate-200 pt-2 font-bold text-slate-900">
-                            <span>Total</span>
-                            <span>{formatMoney(roundTripTransportAmounts.total)}</span>
-                          </div>
+                          {roundTripTransportAmounts.segmentVentilationReliable &&
+                          roundTripTransportAmounts.outbound != null &&
+                          roundTripTransportAmounts.inbound != null ? (
+                            <>
+                              <div className="flex justify-between gap-3">
+                                <span>Aller</span>
+                                <span className="font-semibold text-slate-900">
+                                  {formatMoney(roundTripTransportAmounts.outbound)}
+                                </span>
+                              </div>
+                              <div className="flex justify-between gap-3">
+                                <span>Retour</span>
+                                <span className="font-semibold text-slate-900">
+                                  {formatMoney(roundTripTransportAmounts.inbound)}
+                                </span>
+                              </div>
+                            </>
+                          ) : (
+                            <div className="flex justify-between gap-3 font-bold text-slate-900">
+                              <span>Total aller-retour (forfait Armas)</span>
+                              <span>{formatMoney(roundTripTransportAmounts.total)}</span>
+                            </div>
+                          )}
+                          {roundTripTransportAmounts.segmentVentilationReliable &&
+                          roundTripTransportAmounts.outbound != null &&
+                          roundTripTransportAmounts.inbound != null ? (
+                            <div className="flex justify-between gap-3 border-t border-slate-200 pt-2 font-bold text-slate-900">
+                              <span>Total</span>
+                              <span>{formatMoney(roundTripTransportAmounts.total)}</span>
+                            </div>
+                          ) : null}
                         </div>
                       </div>
                     ) : null}
@@ -2258,9 +3489,17 @@ function ResultatsPageContent() {
                   <div className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 shadow-[0_-6px_24px_rgba(15,23,42,0.12)] backdrop-blur-md lg:hidden">
                     {roundTripTransportAmounts ? (
                       <p className="mb-2 text-center text-[11px] font-semibold text-slate-800">
-                        Aller {formatMoney(roundTripTransportAmounts.outbound)} ·
-                        Retour {formatMoney(roundTripTransportAmounts.inbound)} ·
-                        Total {formatMoney(roundTripTransportAmounts.total)}
+                        {roundTripTransportAmounts.segmentVentilationReliable &&
+                        roundTripTransportAmounts.outbound != null &&
+                        roundTripTransportAmounts.inbound != null ? (
+                          <>
+                            Aller {formatMoney(roundTripTransportAmounts.outbound)} ·
+                            Retour {formatMoney(roundTripTransportAmounts.inbound)} ·
+                            Total {formatMoney(roundTripTransportAmounts.total)}
+                          </>
+                        ) : (
+                          <>Total aller-retour {formatMoney(roundTripTransportAmounts.total)}</>
+                        )}
                       </p>
                     ) : null}
                     <p className="mb-2 line-clamp-2 text-center text-[11px] leading-snug text-slate-700">
@@ -2320,7 +3559,10 @@ function ResultatsPageContent() {
                         Réduction
                       </p>
                       <p className="mt-2 text-sm font-semibold text-slate-900">
-                        {discountLabel(flow.search.bonificacion)}
+                        {discountLabel(
+                          flow.search.bonificacion,
+                          flow.search.bonificacionLabel
+                        )}
                       </p>
                     </div>
                   </div>

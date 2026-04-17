@@ -1,8 +1,18 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f7f5f2;
+  --foreground: #102341;
+  --solair-navy: #163b6d;
+  --solair-navy-deep: #102d54;
+  --solair-orange: #f28c28;
+  --solair-orange-deep: #df7413;
+  --solair-red: #d94a3a;
+  --solair-teal: #2ca6a4;
+  --solair-cream: #f7f5f2;
+  --solair-sand: #fff7ee;
+  --solair-sky: #eef6ff;
+  --solair-border: #d9e5f0;
 }
 
 @theme inline {
@@ -12,15 +22,212 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), "Avenir Next", "Segoe UI", sans-serif;
+  background-image:
+    radial-gradient(circle at top right, rgb(242 140 40 / 0.16), transparent 24rem),
+    radial-gradient(circle at top left, rgb(44 166 164 / 0.12), transparent 20rem),
+    linear-gradient(180deg, #fcfbf8 0%, var(--solair-cream) 24%, #f3eee7 100%);
+  background-attachment: fixed;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+img {
+  display: block;
+  max-width: 100%;
+}
+
+::selection {
+  background: rgb(242 140 40 / 0.22);
+  color: var(--solair-navy-deep);
+}
+
+.solair-hero {
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 10% 16%, rgb(44 166 164 / 0.24), transparent 17rem),
+    radial-gradient(circle at 88% 8%, rgb(242 140 40 / 0.3), transparent 18rem),
+    radial-gradient(circle at 78% 0%, rgb(217 74 58 / 0.2), transparent 14rem),
+    linear-gradient(135deg, var(--solair-navy-deep) 0%, var(--solair-navy) 56%, #235392 100%);
+}
+
+.solair-hero::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    rgb(255 255 255 / 0),
+    rgb(255 255 255 / 0.28),
+    rgb(255 255 255 / 0)
+  );
+}
+
+.solair-home-hero {
+  position: relative;
+  background-color: var(--solair-navy-deep);
+  background-position: center center;
+  background-repeat: no-repeat;
+  background-size: cover;
+}
+
+.solair-home-stage {
+  background: linear-gradient(
+    180deg,
+    rgb(8 26 50 / 0.72) 0%,
+    rgb(11 36 68 / 0.55) 45%,
+    rgb(11 36 68 / 0.42) 100%
+  );
+}
+
+.solair-home-stage::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: min(38vw, 420px);
+  background: linear-gradient(
+    105deg,
+    rgb(8 26 50 / 0.55),
+    rgb(8 26 50 / 0) 88%
+  );
+  pointer-events: none;
+}
+
+.solair-home-stage::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    ellipse 120% 80% at 100% 0%,
+    rgb(255 255 255 / 0.06),
+    transparent 55%
+  );
+  pointer-events: none;
+}
+
+.solair-panel {
+  border: 1px solid rgb(217 229 240 / 0.92);
+  border-radius: 28px;
+  background: rgb(255 255 255 / 0.96);
+  box-shadow: 0 16px 40px rgb(15 23 42 / 0.08);
+  backdrop-filter: blur(12px);
+}
+
+.solair-logo-badge {
+  border: 1px solid rgb(255 255 255 / 0.32);
+  border-radius: 28px;
+  background:
+    linear-gradient(135deg, rgb(255 255 255 / 0.98), rgb(255 247 238 / 0.94));
+  box-shadow: 0 16px 40px rgb(15 23 42 / 0.18);
+}
+
+.solair-stepbar {
+  display: flex;
+  gap: 0.625rem;
+  overflow-x: auto;
+  padding-bottom: 0.35rem;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.solair-stepbar::-webkit-scrollbar {
+  display: none;
+}
+
+.solair-stepchip {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  padding: 0.58rem 0.95rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.01em;
+}
+
+.solair-stepchip--done {
+  background: rgb(255 255 255 / 0.96);
+  color: var(--solair-navy);
+  box-shadow: 0 6px 20px rgb(12 36 67 / 0.12);
+}
+
+.solair-stepchip--active {
+  background: linear-gradient(135deg, var(--solair-orange), #f7a744);
+  color: white;
+  box-shadow: 0 12px 28px rgb(242 140 40 / 0.34);
+}
+
+.solair-stepchip--pending {
+  background: rgb(255 255 255 / 0.12);
+  color: rgb(255 255 255 / 0.94);
+  border: 1px solid rgb(255 255 255 / 0.14);
+}
+
+.solair-secondary-btn {
+  border-radius: 1rem;
+  border: 1px solid rgb(255 255 255 / 0.22);
+  background: rgb(255 255 255 / 0.12);
+  color: white;
+  transition:
+    background-color 0.18s ease,
+    transform 0.18s ease,
+    border-color 0.18s ease;
+}
+
+.solair-secondary-btn:hover {
+  background: rgb(255 255 255 / 0.18);
+  transform: translateY(-1px);
+}
+
+.solair-primary-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.75rem;
+  background: var(--solair-orange);
+  box-shadow: 0 1px 2px rgb(15 23 42 / 0.06);
+  transition:
+    background-color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.solair-primary-btn:hover {
+  background: #e57c12;
+  box-shadow: 0 4px 12px rgb(242 140 40 / 0.22);
+}
+
+@media (max-width: 640px) {
+  .solair-panel {
+    border-radius: 24px;
+    box-shadow: 0 12px 28px rgb(15 23 42 / 0.08);
+  }
+
+  .solair-logo-badge {
+    border-radius: 24px;
+  }
+
+  .solair-secondary-btn,
+  .solair-primary-btn {
+    width: 100%;
+  }
+}
+
+@media (max-width: 1024px) {
+  .solair-home-stage {
+    background: linear-gradient(
+      180deg,
+      rgb(8 26 50 / 0.62) 0%,
+      rgb(11 36 68 / 0.48) 100%
+    );
+  }
+
+  .solair-home-stage::before {
+    display: none;
+  }
 }

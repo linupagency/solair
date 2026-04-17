@@ -73,6 +73,8 @@ function isSelectedDeparture(
     typeof candidate.destino === "string" &&
     typeof candidate.fechaSalida === "string" &&
     typeof candidate.horaSalida === "string" &&
+    (typeof candidate.sentidoSalida === "undefined" ||
+      typeof candidate.sentidoSalida === "number") &&
     typeof candidate.codigoServicioVenta === "string" &&
     typeof candidate.tipoServicioVenta === "string"
   );
@@ -342,6 +344,8 @@ function sanitizeSelectedDeparture(
     destino: normalizeString(departure.destino),
     fechaSalida: normalizeString(departure.fechaSalida),
     horaSalida: normalizeString(departure.horaSalida),
+    // Sécurisation côté parsing serveur: en AR, l’inbound est toujours sentido=2.
+    sentidoSalida: 2,
     codigoServicioVenta: normalizeString(departure.codigoServicioVenta),
     tipoServicioVenta: normalizeString(departure.tipoServicioVenta),
     barco: normalizeString(departure.barco),

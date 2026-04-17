@@ -17,6 +17,7 @@ import {
   type BookingTraveler,
   type BookingVehicleSelection,
 } from "@/lib/booking-flow";
+import { getCommercialLabel } from "@/lib/ui/armas-commercial";
 
 type DocumentType = {
   tipoDocumento?: string;
@@ -92,18 +93,7 @@ function formatMoney(value?: string | number) {
 }
 
 function serviceLabel(code?: string) {
-  switch (code) {
-    case "BY":
-      return "Option passager BY";
-    case "BP":
-      return "Option passager BP";
-    case "P":
-      return "Option duo P";
-    case "Q":
-      return "Option famille Q";
-    default:
-      return code ? `Service ${code}` : "Service passager";
-  }
+  return getCommercialLabel({ codigoServicioVenta: code, tipoServicioVenta: "P" });
 }
 
 function passengerTypeLabel(code?: string) {
@@ -140,7 +130,9 @@ function passengerTypeLabelWithAge(code?: string) {
   }
 }
 
-function discountLabel(code?: string) {
+function discountLabel(code?: string, apiLabel?: string) {
+  if (apiLabel?.trim()) return apiLabel.trim();
+
   switch (code) {
     case "G":
       return "Tarif général";
@@ -314,7 +306,7 @@ function SectionCard({
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_10px_28px_rgba(15,23,42,0.05)] sm:p-6">
+    <section className="solair-panel p-5 sm:p-6">
       <div className="mb-5">
         <h2 className="text-xl font-bold text-slate-900">{title}</h2>
         {subtitle ? (
@@ -617,22 +609,22 @@ export default function PassagersPage() {
 
   return (
     <main className="min-h-screen bg-[#F7F5F2] text-slate-900">
-      <section className="bg-[#163B6D] pb-8 pt-5">
-        <div className="mx-auto max-w-7xl px-4">
-          <div className="mb-5 flex flex-wrap items-center gap-2">
-            <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-[#163B6D]">
+      <section className="solair-hero pb-8 pt-5">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6">
+          <div className="solair-stepbar mb-5">
+            <span className="solair-stepchip solair-stepchip--done">
               1. Recherche
             </span>
-            <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-[#163B6D]">
+            <span className="solair-stepchip solair-stepchip--done">
               2. Traversées et prix
             </span>
-            <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-[#163B6D]">
+            <span className="solair-stepchip solair-stepchip--done">
               3. Hébergement
             </span>
-            <span className="rounded-full bg-[#F28C28] px-3 py-1 text-xs font-semibold text-white">
+            <span className="solair-stepchip solair-stepchip--active">
               4. Passager
             </span>
-            <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-semibold text-white">
+            <span className="solair-stepchip solair-stepchip--pending">
               5. Récapitulatif
             </span>
           </div>
@@ -653,7 +645,7 @@ export default function PassagersPage() {
             <button
               type="button"
               onClick={() => router.back()}
-              className="rounded-2xl border border-white/20 bg-white/10 px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/20"
+              className="solair-secondary-btn px-4 py-3 text-sm font-semibold"
             >
               Retour
             </button>
@@ -735,7 +727,7 @@ export default function PassagersPage() {
                   >
                     <div className="mb-4 rounded-2xl bg-[#F4FAFF] p-4 ring-1 ring-[#CDE4F7]">
                       <p className="text-xs font-semibold uppercase tracking-wide text-[#163B6D]">
-                        Informations d'identite
+                        Informations d&apos;identite
                       </p>
                       <p className="mt-1 text-sm text-slate-600">
                         Renseignez les donnees du document comme sur le formulaire
@@ -772,7 +764,7 @@ export default function PassagersPage() {
                               e.target.value.toUpperCase()
                             )
                           }
-                          placeholder="Ex. DUPONT"
+                          placeholder="Ex. beni"
                           hasError={submitted && !!errors?.apellido1}
                         />
                       </Field>
@@ -792,7 +784,7 @@ export default function PassagersPage() {
                               e.target.value.toUpperCase()
                             )
                           }
-                          placeholder="Ex. SAMIA"
+                          placeholder="Ex. ali"
                           hasError={submitted && !!errors?.nombre}
                         />
                       </Field>
@@ -1077,7 +1069,10 @@ export default function PassagersPage() {
                     </p>
                     <p className="mt-2 text-sm text-slate-600">
                       {flow.tripType === "round_trip" ? "Aller-retour" : "Aller simple"} •{" "}
-                      {discountLabel(flow.search.bonificacion)}
+                      {discountLabel(
+                        flow.search.bonificacion,
+                        flow.search.bonificacionLabel
+                      )}
                     </p>
                     <p className="mt-1 text-sm text-slate-600">
                       {animalsSummary(flow)}
@@ -1090,7 +1085,7 @@ export default function PassagersPage() {
                       résidents non-péninsulaires et les familles nombreuses,
                       adoptée dans la Loi de Finances Générale pour 2021, la
                       réduction pour résidents sera indiquée et appliquée lors de
-                      la dernière étape du processus d'achat, en même temps que
+                      la dernière étape du processus d&apos;achat, en même temps que
                       les données de chaque passager.
                     </p>
                   </div>

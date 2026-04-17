@@ -25,8 +25,10 @@ import {
   type TarificacionCompanionCatalog,
 } from "@/lib/armas/tarificacion-post-body";
 import { fetchTransportPricing } from "@/lib/armas/transport-pricing-client";
+import { isArmasRtPricingDebugEnabled } from "@/lib/armas/rt-pricing-debug";
 import { getTarificacionRawLinesFromSoapResult } from "@/lib/armas/tarificacion-normalize";
 import { getLegacyVehicleForPricingParam } from "@/lib/solair-legacy-vehicle-pricing";
+import { getCommercialLabel } from "@/lib/ui/armas-commercial";
 
 type PricingLine = {
   bonificacionEntidad?: {
@@ -67,6 +69,7 @@ type SegmentPricingState = {
   tarifaLabel?: string;
   bonificationLabel?: string;
   errorMessage?: string;
+  roundTripBundleCombined?: boolean;
 };
 
 function normalizeArray<T>(value?: T[] | T): T[] {
@@ -93,6 +96,10 @@ function formatMoney(value?: string | number | null) {
   return `${parsed.toFixed(2).replace(".", ",")} €`;
 }
 
+function isSuccessPricing(state: SegmentPricingState) {
+  return state.status === "success" && typeof state.totalValue === "number";
+}
+
 function formatApiDate(value?: string) {
   if (!value) return "-";
 
@@ -114,18 +121,7 @@ function formatApiTime(value?: string) {
 }
 
 function serviceLabel(code?: string) {
-  switch (code) {
-    case "BY":
-      return "Option passager BY";
-    case "BP":
-      return "Option passager BP";
-    case "P":
-      return "Option duo P";
-    case "Q":
-      return "Option famille Q";
-    default:
-      return code ? `Service ${code}` : "Service passager";
-  }
+  return getCommercialLabel({ codigoServicioVenta: code, tipoServicioVenta: "P" });
 }
 
 function passengerTypeLabel(code: string) {
@@ -257,7 +253,6 @@ function buildVehicleDataForDraft(vehicle?: BookingVehicleSelection) {
   };
 }
 
-/** Date Armas AAAAMMJJ ou ISO → AAAAMMJJ (champ draft / validation API). */
 function normalizeArmasYYYYMMDD(value?: string | null): string {
   if (value == null) return "";
   const v = String(value).trim();
@@ -295,6 +290,7 @@ function buildInboundSelectedDepartureForDraft(
     destino,
     fechaSalida,
     horaSalida,
+    sentidoSalida: 2,
     codigoServicioVenta,
     tipoServicioVenta,
   };
@@ -345,7 +341,7 @@ function SectionCard({
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_10px_28px_rgba(15,23,42,0.05)] sm:p-6">
+    <section className="solair-panel p-5 sm:p-6">
       <div className="mb-5">
         <h2 className="text-xl font-bold text-slate-900">{title}</h2>
         {subtitle ? <p className="mt-1 text-sm text-slate-500">{subtitle}</p> : null}
@@ -384,6 +380,55 @@ export default function RecapitulatifPage() {
 
       const safeFlow = currentFlow as BookingFlow;
       const outboundDeparture = safeFlow.outbound.selectedDeparture!;
+      const selectedRtPricing = safeFlow.totals.selectedRoundTripPricing;
+      if (
+        safeFlow.tripType === "round_trip" &&
+        safeFlow.inbound?.selectedDeparture &&
+        selectedRtPricing &&
+        selectedRtPricing.totalEuros > 0 &&
+        selectedRtPricing.outboundSegment.origen === outboundDeparture.origen &&
+        selectedRtPricing.outboundSegment.destino === outboundDeparture.destino &&
+        selectedRtPricing.outboundSegment.fechaSalida === outboundDeparture.fechaSalida &&
+        selectedRtPricing.outboundSegment.horaSalida === outboundDeparture.horaSalida &&
+        selectedRtPricing.inboundSegment.origen ===
+          safeFlow.inbound.selectedDeparture.origen &&
+        selectedRtPricing.inboundSegment.destino ===
+          safeFlow.inbound.selectedDeparture.destino &&
+        selectedRtPricing.inboundSegment.fechaSalida ===
+          safeFlow.inbound.selectedDeparture.fechaSalida &&
+        selectedRtPricing.inboundSegment.horaSalida ===
+          safeFlow.inbound.selectedDeparture.horaSalida
+      ) {
+        const hasLegSplit =
+          selectedRtPricing.outboundEuros != null &&
+          selectedRtPricing.inboundEuros != null &&
+          Number.isFinite(selectedRtPricing.outboundEuros) &&
+          Number.isFinite(selectedRtPricing.inboundEuros);
+        if (hasLegSplit) {
+          setOutboundPricing({
+            status: "success",
+            totalValue: selectedRtPricing.outboundEuros!,
+            totalDisplay: formatMoney(selectedRtPricing.outboundEuros!),
+          });
+          setInboundPricing({
+            status: "success",
+            totalValue: selectedRtPricing.inboundEuros!,
+            totalDisplay: formatMoney(selectedRtPricing.inboundEuros!),
+          });
+        } else {
+          setOutboundPricing({
+            status: "success",
+            totalValue: selectedRtPricing.totalEuros,
+            totalDisplay: formatMoney(selectedRtPricing.totalEuros),
+            roundTripBundleCombined: true,
+          });
+          setInboundPricing({
+            status: "success",
+            roundTripBundleCombined: true,
+          });
+        }
+        return;
+      }
 
       const passengerCount = getPassengerCount(safeFlow);
       const primaryPassengerType = getPrimaryPassengerType(
@@ -421,9 +466,11 @@ export default function RecapitulatifPage() {
             },
             catalog
           );
+
           if (!built.ok) {
             throw new Error(built.error);
           }
+
           const priced = await fetchTransportPricing(
             built.body,
             built.normalizedVehicle,
@@ -431,9 +478,11 @@ export default function RecapitulatifPage() {
               ? { tripType: "round_trip", armasLeg }
               : undefined
           );
+
           if (!priced.ok) {
             throw new Error(priced.error);
           }
+
           const totalValue = priced.totalEuros;
           if (totalValue === null) {
             throw new Error("Aucune tarification retournée.");
@@ -461,12 +510,184 @@ export default function RecapitulatifPage() {
         }
       }
 
+      async function fetchRoundTripSegments(
+        outboundCatalog?: TarificacionCompanionCatalog,
+        inboundCatalog?: TarificacionCompanionCatalog
+      ): Promise<{
+        outbound: SegmentPricingState;
+        inbound: SegmentPricingState;
+      }> {
+        if (
+          safeFlow.tripType !== "round_trip" ||
+          !safeFlow.outbound.selectedDeparture ||
+          !safeFlow.inbound?.selectedDeparture
+        ) {
+          throw new Error("Dossier aller-retour incomplet.");
+        }
+
+        const outboundDep = safeFlow.outbound.selectedDeparture!;
+        const inboundDep = safeFlow.inbound.selectedDeparture!;
+
+        const outBuilt = tryBuildTarificacionPostBodyFromFlow(
+          safeFlow,
+          {
+            origen: outboundDep.origen,
+            destino: outboundDep.destino,
+            fechaSalida: outboundDep.fechaSalida,
+            horaSalida: outboundDep.horaSalida,
+          },
+          {
+            cantidad: passengerCount,
+            codigoServicioVenta: outboundDep.codigoServicioVenta,
+            tipoServicioVenta: outboundDep.tipoServicioVenta,
+            tipoPasajero: primaryPassengerType,
+            passengerTipos,
+          },
+          outboundCatalog
+        );
+        if (!outBuilt.ok) {
+          throw new Error(outBuilt.error);
+        }
+
+        const inBuilt = tryBuildTarificacionPostBodyFromFlow(
+          safeFlow,
+          {
+            origen: inboundDep.origen,
+            destino: inboundDep.destino,
+            fechaSalida: inboundDep.fechaSalida,
+            horaSalida: inboundDep.horaSalida,
+          },
+          {
+            cantidad: passengerCount,
+            codigoServicioVenta: inboundDep.codigoServicioVenta,
+            tipoServicioVenta: inboundDep.tipoServicioVenta,
+            tipoPasajero: primaryPassengerType,
+            passengerTipos,
+          },
+          inboundCatalog
+        );
+        if (!inBuilt.ok) {
+          throw new Error(inBuilt.error);
+        }
+
+        const priced = await fetchTransportPricing(
+          outBuilt.body,
+          outBuilt.normalizedVehicle,
+          {
+            tripType: "round_trip",
+            armasLeg: "outbound",
+            returnSegment: {
+              origen: inBuilt.body.origen,
+              destino: inBuilt.body.destino,
+              fechaSalida: inBuilt.body.fechaSalida,
+              horaSalida: inBuilt.body.horaSalida,
+              codigoServicioVenta: inBuilt.body.codigoServicioVenta,
+              tipoServicioVenta: inBuilt.body.tipoServicioVenta,
+              sentidoSalida: 2,
+            },
+          }
+        );
+
+        if (!priced.ok) {
+          throw new Error(priced.error);
+        }
+
+        const bundle = priced.roundTripTotalEuros ?? priced.totalEuros ?? null;
+        if (bundle === null || !Number.isFinite(bundle) || bundle <= 0) {
+          throw new Error("Aucun total aller-retour exploitable.");
+        }
+
+        const lines = normalizeArray(
+          getTarificacionRawLinesFromSoapResult(priced.soapData) as PricingLine[]
+        );
+        const first = lines[0];
+        const common = {
+          codigoTarifa: first?.tarifaEntidad?.codigoTarifa || "",
+          tarifaLabel: first?.tarifaEntidad?.textoCorto || "-",
+          bonificationLabel: first?.bonificacionEntidad?.textoCorto || "",
+        };
+
+        const segmentVentilationReliable =
+          priced.segmentVentilationReliable === true;
+
+        if (segmentVentilationReliable) {
+          const outboundTotal = priced.outboundEuros;
+          const inboundTotal = priced.returnEuros;
+
+          if (
+            outboundTotal === null ||
+            inboundTotal === null ||
+            !Number.isFinite(outboundTotal) ||
+            !Number.isFinite(inboundTotal)
+          ) {
+            throw new Error("Aucune ventilation AR ida/vta exploitable.");
+          }
+
+          return {
+            outbound: {
+              status: "success",
+              totalValue: outboundTotal,
+              totalDisplay: formatMoney(outboundTotal),
+              ...common,
+            },
+            inbound: {
+              status: "success",
+              totalValue: inboundTotal,
+              totalDisplay: formatMoney(inboundTotal),
+              ...common,
+            },
+          };
+        }
+
+        return {
+          outbound: {
+            status: "success",
+            totalValue: bundle,
+            totalDisplay: formatMoney(bundle),
+            ...common,
+            roundTripBundleCombined: true,
+          },
+          inbound: {
+            status: "success",
+            totalValue: undefined,
+            totalDisplay: undefined,
+            ...common,
+            roundTripBundleCombined: true,
+          },
+        };
+      }
+
       setOutboundPricing({ status: "loading" });
       setInboundPricing(
         safeFlow.tripType === "round_trip"
           ? { status: "loading" }
           : { status: "idle" }
       );
+
+      if (
+        safeFlow.tripType === "round_trip" &&
+        safeFlow.inbound?.selectedDeparture
+      ) {
+        try {
+          const both = await fetchRoundTripSegments(
+            safeFlow.outbound.availableServices?.length
+              ? { serviciosVentas: safeFlow.outbound.availableServices }
+              : undefined,
+            safeFlow.inbound?.availableServices?.length
+              ? { serviciosVentas: safeFlow.inbound.availableServices }
+              : undefined
+          );
+
+          setOutboundPricing(both.outbound);
+          setInboundPricing(both.inbound);
+        } catch (error) {
+          const msg =
+            error instanceof Error ? error.message : "Erreur de tarification AR.";
+          setOutboundPricing({ status: "error", errorMessage: msg });
+          setInboundPricing({ status: "error", errorMessage: msg });
+        }
+        return;
+      }
 
       const outbound = await fetchOneSegment(
         {
@@ -485,10 +706,7 @@ export default function RecapitulatifPage() {
 
       setOutboundPricing(outbound);
 
-      if (
-        safeFlow.tripType === "round_trip" &&
-        safeFlow.inbound?.selectedDeparture
-      ) {
+      if (safeFlow.tripType === "round_trip" && safeFlow.inbound?.selectedDeparture) {
         const inboundDeparture = safeFlow.inbound.selectedDeparture!;
 
         const inbound = await fetchOneSegment(
@@ -500,7 +718,7 @@ export default function RecapitulatifPage() {
             codigoServicioVenta: inboundDeparture.codigoServicioVenta,
             tipoServicioVenta: inboundDeparture.tipoServicioVenta,
           },
-          safeFlow.inbound?.availableServices?.length
+          safeFlow.inbound.availableServices?.length
             ? { serviciosVentas: safeFlow.inbound.availableServices }
             : undefined,
           "inbound"
@@ -539,25 +757,94 @@ export default function RecapitulatifPage() {
     return finalTotalFromFlow !== null && finalTotalFromFlow > 0;
   }, [finalTotalFromFlow]);
 
-  const transportTotal = useMemo(() => {
-    if (hasPricedFlowTotals) {
-      const ob = normalizeMoneyToNumber(flow?.totals.transportOutbound) ?? 0;
-      const ib =
-        flow?.tripType === "round_trip"
-          ? normalizeMoneyToNumber(flow?.totals.transportInbound) ?? 0
-          : 0;
-      return ob + ib;
+  const freshPricingReady = useMemo(() => {
+    if (!flow) return false;
+
+    if (flow.tripType === "round_trip") {
+      if (
+        outboundPricing.status === "success" &&
+        outboundPricing.roundTripBundleCombined === true
+      ) {
+        return true;
+      }
+
+      return isSuccessPricing(outboundPricing) && isSuccessPricing(inboundPricing);
     }
-    const outbound = outboundPricing.totalValue ?? 0;
-    const inbound = inboundPricing.totalValue ?? 0;
-    return outbound + inbound;
+
+    return isSuccessPricing(outboundPricing);
+  }, [flow, outboundPricing, inboundPricing]);
+
+  const transportTotal = useMemo(() => {
+    if (!flow) return 0;
+
+    if (freshPricingReady) {
+      if (
+        flow.tripType === "round_trip" &&
+        outboundPricing.roundTripBundleCombined === true
+      ) {
+        return outboundPricing.totalValue ?? 0;
+      }
+
+      const outbound = outboundPricing.totalValue ?? 0;
+      const inbound =
+        flow.tripType === "round_trip" ? inboundPricing.totalValue ?? 0 : 0;
+
+      return flow.tripType === "round_trip" ? outbound + inbound : outbound;
+    }
+
+    const canonical = flow.totals.transportPricingCanonical;
+
+    if (canonical && flow.tripType === "round_trip") {
+      if (
+        canonical.segmentVentilationReliable &&
+        canonical.outboundEuros != null &&
+        canonical.inboundEuros != null
+      ) {
+        return canonical.outboundEuros + canonical.inboundEuros;
+      }
+
+      return canonical.totalBundleEuros;
+    }
+
+    if (canonical && flow.tripType === "one_way") {
+      return canonical.totalBundleEuros;
+    }
+
+    if (hasPricedFlowTotals) {
+      const outbound = normalizeMoneyToNumber(flow.totals.transportOutbound) ?? 0;
+      const inbound =
+        flow.tripType === "round_trip"
+          ? normalizeMoneyToNumber(flow.totals.transportInbound) ?? 0
+          : 0;
+
+      return outbound + inbound;
+    }
+
+    return 0;
   }, [
-    hasPricedFlowTotals,
-    flow?.totals.transportOutbound,
-    flow?.totals.transportInbound,
-    flow?.tripType,
+    flow,
+    freshPricingReady,
     outboundPricing.totalValue,
+    outboundPricing.roundTripBundleCombined,
     inboundPricing.totalValue,
+    hasPricedFlowTotals,
+  ]);
+
+  const roundTripTransportBundleDisplay = useMemo(() => {
+    if (!flow || flow.tripType !== "round_trip") return false;
+
+    if (freshPricingReady) {
+      return outboundPricing.roundTripBundleCombined === true;
+    }
+
+    const canonical = flow.totals.transportPricingCanonical;
+    if (canonical) return !canonical.segmentVentilationReliable;
+
+    return false;
+  }, [
+    flow,
+    freshPricingReady,
+    outboundPricing.roundTripBundleCombined,
   ]);
 
   const accommodationTotal = useMemo(() => {
@@ -583,36 +870,94 @@ export default function RecapitulatifPage() {
   ]);
 
   const finalTotal = useMemo(() => {
+    if (freshPricingReady) {
+      return transportTotal + accommodationTotal;
+    }
+
     if (hasPricedFlowTotals && finalTotalFromFlow !== null) {
       return finalTotalFromFlow;
     }
+
     return transportTotal + accommodationTotal;
   }, [
+    freshPricingReady,
     hasPricedFlowTotals,
     finalTotalFromFlow,
     transportTotal,
     accommodationTotal,
   ]);
 
+  useEffect(() => {
+    if (!isArmasRtPricingDebugEnabled()) return;
+    if (!flow) return;
+    if (outboundPricing.status !== "success") return;
+    if (
+      flow.tripType === "round_trip" &&
+      inboundPricing.status !== "success" &&
+      outboundPricing.roundTripBundleCombined !== true
+    ) {
+      return;
+    }
+
+    console.info(
+      "[SOLAIR_ARMAS_RT_PRICING_DEBUG] recap.displayAndPayment",
+      JSON.stringify(
+        {
+          tripType: flow.tripType,
+          transportOutboundEuros: outboundPricing.totalValue ?? null,
+          transportInboundEuros:
+            flow.tripType === "round_trip"
+              ? inboundPricing.totalValue ?? null
+              : null,
+          transportSumEuros: transportTotal,
+          accommodationSumEuros: accommodationTotal,
+          finalTotalDisplayedEuros: finalTotal,
+          paypalAndDraftAmountString: finalTotal.toFixed(2),
+        },
+        null,
+        0
+      )
+    );
+  }, [
+    flow,
+    outboundPricing.status,
+    outboundPricing.totalValue,
+    outboundPricing.roundTripBundleCombined,
+    inboundPricing.status,
+    inboundPricing.totalValue,
+    transportTotal,
+    accommodationTotal,
+    finalTotal,
+  ]);
+
   const paymentSupported = useMemo(() => {
     if (!flow || !travelersComplete) return false;
+    if (!Number.isFinite(finalTotal) || finalTotal <= 0) return false;
+
     if (outboundPricing.status !== "success" || !outboundPricing.codigoTarifa) {
       return false;
     }
+
     if (flow.tripType === "round_trip") {
+      if (roundTripTransportBundleDisplay) {
+        return true;
+      }
+
       if (inboundPricing.status !== "success" || !inboundPricing.codigoTarifa) {
         return false;
       }
     }
-    return finalTotal > 0;
+
+    return true;
   }, [
     flow,
     travelersComplete,
+    finalTotal,
     outboundPricing.status,
     outboundPricing.codigoTarifa,
     inboundPricing.status,
     inboundPricing.codigoTarifa,
-    finalTotal,
+    roundTripTransportBundleDisplay,
   ]);
 
   async function handleProceedToPayment() {
@@ -627,6 +972,11 @@ export default function RecapitulatifPage() {
     const firstTraveler = safeFlow.travelers[0];
     if (!firstTraveler) {
       setPaymentError("Aucun voyageur exploitable pour le paiement.");
+      return;
+    }
+
+    if (!Number.isFinite(finalTotal) || finalTotal <= 0) {
+      setPaymentError("Montant total invalide pour le paiement.");
       return;
     }
 
@@ -766,6 +1116,34 @@ export default function RecapitulatifPage() {
         vehiclesList,
       };
 
+      if (isArmasRtPricingDebugEnabled()) {
+        console.info(
+          "[AR_SENTIDO_CHECK] recap.draftPayload",
+          JSON.stringify(
+            {
+              tripType: draftBody.tripType,
+              outboundSentidoSalida: 1,
+              inboundSentidoSalida:
+                draftBody.tripType === "round_trip"
+                  ? draftBody.inboundSelectedDeparture?.sentidoSalida ?? null
+                  : null,
+              outbound: {
+                origen: draftBody.origen,
+                destino: draftBody.destino,
+                fechaSalida: draftBody.fechaSalida,
+                horaSalida: draftBody.horaSalida,
+              },
+              inbound:
+                draftBody.tripType === "round_trip"
+                  ? draftBody.inboundSelectedDeparture
+                  : null,
+            },
+            null,
+            0
+          )
+        );
+      }
+
       const draftResponse = await fetch("/api/booking/draft", {
         method: "POST",
         headers: {
@@ -779,9 +1157,7 @@ export default function RecapitulatifPage() {
       if (!draftResponse.ok || !draftJson.ok || !draftJson.draftId) {
         const missing = draftJson.missingFields;
         if (Array.isArray(missing) && missing.length > 0) {
-          throw new Error(
-            `Paramètres manquants : ${missing.join(", ")}`
-          );
+          throw new Error(`Paramètres manquants : ${missing.join(", ")}`);
         }
         throw new Error(
           draftJson.error ||
@@ -854,22 +1230,22 @@ export default function RecapitulatifPage() {
 
   return (
     <main className="min-h-screen bg-[#F7F5F2] text-slate-900">
-      <section className="bg-[#163B6D] pb-8 pt-5">
-        <div className="mx-auto max-w-7xl px-4">
-          <div className="mb-5 flex flex-wrap items-center gap-2">
-            <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-[#163B6D]">
+      <section className="solair-hero pb-8 pt-5">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6">
+          <div className="solair-stepbar mb-5">
+            <span className="solair-stepchip solair-stepchip--done">
               1. Recherche
             </span>
-            <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-[#163B6D]">
+            <span className="solair-stepchip solair-stepchip--done">
               2. Traversées et prix
             </span>
-            <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-[#163B6D]">
+            <span className="solair-stepchip solair-stepchip--done">
               3. Hébergement
             </span>
-            <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-[#163B6D]">
+            <span className="solair-stepchip solair-stepchip--done">
               4. Passager
             </span>
-            <span className="rounded-full bg-[#F28C28] px-3 py-1 text-xs font-semibold text-white">
+            <span className="solair-stepchip solair-stepchip--active">
               5. Récapitulatif
             </span>
           </div>
@@ -890,7 +1266,7 @@ export default function RecapitulatifPage() {
             <button
               type="button"
               onClick={() => router.back()}
-              className="rounded-2xl border border-white/20 bg-white/10 px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/20"
+              className="solair-secondary-btn px-4 py-3 text-sm font-semibold"
             >
               Retour
             </button>
@@ -978,7 +1354,12 @@ export default function RecapitulatifPage() {
                             </p>
                             <p className="mt-1 text-sm text-slate-600">
                               {passengerTypeLabel(
-                                getPrimaryPassengerType(bookingFlow.search.passengers)
+                                traveler.tipoPasajero ||
+                                  getTipoPasajeroForPassengerIndex(
+                                    bookingFlow.search.passengers,
+                                    index
+                                  ) ||
+                                  getPrimaryPassengerType(bookingFlow.search.passengers)
                               )}
                             </p>
                           </div>
@@ -987,7 +1368,7 @@ export default function RecapitulatifPage() {
                             <p className="text-sm font-semibold text-slate-900">
                               {documentTypeLabel(traveler.tipoDocumento)}
                             </p>
-                            <p className="mt-1 text-sm text-slate-600 break-all">
+                            <p className="mt-1 break-all text-sm text-slate-600">
                               {traveler.codigoDocumento || "-"}
                             </p>
                             <p className="mt-1 text-sm text-slate-600">
@@ -1065,7 +1446,7 @@ export default function RecapitulatifPage() {
                     <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                       Email
                     </p>
-                    <p className="mt-2 text-lg font-bold text-slate-900 break-all">
+                    <p className="mt-2 break-all text-lg font-bold text-slate-900">
                       {bookingFlow.contact.mail || "-"}
                     </p>
                   </div>
@@ -1108,48 +1489,32 @@ export default function RecapitulatifPage() {
                     )}
 
                   <div className="rounded-2xl bg-[#F4FAFF] p-4 ring-1 ring-[#CDE4F7]">
-                    <div className="flex items-start justify-between gap-4">
-                      <span className="text-sm text-slate-500">Transport aller</span>
-                      <span className="text-right text-sm font-semibold text-slate-900">
-                        {hasPricedFlowTotals
-                          ? bookingFlow.totals.transportOutbound || "-"
-                          : outboundPricing.totalDisplay ||
-                            bookingFlow.totals.transportOutbound ||
-                            "-"}
-                      </span>
-                    </div>
-
-                    <div className="mt-3 flex items-start justify-between gap-4">
-                      <span className="text-sm text-slate-500">
-                        Supplément hébergement aller
-                      </span>
-                      <span className="text-right text-sm font-semibold text-slate-900">
-                        {hasPricedFlowTotals
-                          ? bookingFlow.totals.accommodationOutbound ||
-                            formatMoney(outboundAccommodationValue)
-                          : formatMoney(outboundAccommodationValue)}
-                      </span>
-                    </div>
-
-                    {bookingFlow.tripType === "round_trip" && (
+                    {bookingFlow.tripType === "round_trip" &&
+                    roundTripTransportBundleDisplay ? (
                       <>
-                        <div className="mt-3 flex items-start justify-between gap-4">
-                          <span className="text-sm text-slate-500">Transport retour</span>
+                        <div className="flex items-start justify-between gap-4">
+                          <span className="text-sm text-slate-500">
+                            Forfait transport aller-retour
+                          </span>
                           <span className="text-right text-sm font-semibold text-slate-900">
-                            {hasPricedFlowTotals
-                              ? bookingFlow.totals.transportInbound || "-"
-                              : inboundPricing.totalDisplay ||
-                                bookingFlow.totals.transportInbound ||
-                                "-"}
+                            {formatMoney(
+                              bookingFlow.totals.transportPricingCanonical
+                                ?.totalBundleEuros ??
+                                outboundPricing.totalValue ??
+                                transportTotal
+                            )}
                           </span>
                         </div>
 
-                        <div className="mt-3 flex items-start justify-between gap-4 border-t border-[#CDE4F7] pt-3">
-                          <span className="text-sm font-semibold text-slate-700">
-                            Total transport (aller + retour)
+                        <div className="mt-3 flex items-start justify-between gap-4">
+                          <span className="text-sm text-slate-500">
+                            Supplément hébergement aller
                           </span>
-                          <span className="text-right text-sm font-bold text-slate-900">
-                            {formatMoney(transportTotal)}
+                          <span className="text-right text-sm font-semibold text-slate-900">
+                            {hasPricedFlowTotals
+                              ? bookingFlow.totals.accommodationOutbound ||
+                                formatMoney(outboundAccommodationValue)
+                              : formatMoney(outboundAccommodationValue)}
                           </span>
                         </div>
 
@@ -1165,6 +1530,96 @@ export default function RecapitulatifPage() {
                           </span>
                         </div>
                       </>
+                    ) : (
+                      <>
+                        <div className="flex items-start justify-between gap-4">
+                          <span className="text-sm text-slate-500">
+                            Transport aller
+                          </span>
+                          <span className="text-right text-sm font-semibold text-slate-900">
+                            {bookingFlow.totals.transportPricingCanonical &&
+                            bookingFlow.tripType === "round_trip" &&
+                            bookingFlow.totals.transportPricingCanonical
+                              .segmentVentilationReliable &&
+                            bookingFlow.totals.transportPricingCanonical
+                              .outboundEuros != null
+                              ? formatMoney(
+                                  bookingFlow.totals.transportPricingCanonical
+                                    .outboundEuros
+                                )
+                              : bookingFlow.totals.transportPricingCanonical &&
+                                  bookingFlow.tripType === "one_way"
+                                ? formatMoney(
+                                    bookingFlow.totals.transportPricingCanonical
+                                      .totalBundleEuros
+                                  )
+                                : hasPricedFlowTotals
+                                  ? bookingFlow.totals.transportOutbound || "-"
+                                  : outboundPricing.totalDisplay ||
+                                    bookingFlow.totals.transportOutbound ||
+                                    "-"}
+                          </span>
+                        </div>
+
+                        <div className="mt-3 flex items-start justify-between gap-4">
+                          <span className="text-sm text-slate-500">
+                            Supplément hébergement aller
+                          </span>
+                          <span className="text-right text-sm font-semibold text-slate-900">
+                            {hasPricedFlowTotals
+                              ? bookingFlow.totals.accommodationOutbound ||
+                                formatMoney(outboundAccommodationValue)
+                              : formatMoney(outboundAccommodationValue)}
+                          </span>
+                        </div>
+
+                        {bookingFlow.tripType === "round_trip" && (
+                          <>
+                            <div className="mt-3 flex items-start justify-between gap-4">
+                              <span className="text-sm text-slate-500">
+                                Transport retour
+                              </span>
+                              <span className="text-right text-sm font-semibold text-slate-900">
+                                {bookingFlow.totals.transportPricingCanonical &&
+                                bookingFlow.totals.transportPricingCanonical
+                                  .segmentVentilationReliable &&
+                                bookingFlow.totals.transportPricingCanonical
+                                  .inboundEuros != null
+                                  ? formatMoney(
+                                      bookingFlow.totals.transportPricingCanonical
+                                        .inboundEuros
+                                    )
+                                  : hasPricedFlowTotals
+                                    ? bookingFlow.totals.transportInbound || "-"
+                                    : inboundPricing.totalDisplay ||
+                                      bookingFlow.totals.transportInbound ||
+                                      "-"}
+                              </span>
+                            </div>
+
+                            <div className="mt-3 flex items-start justify-between gap-4 border-t border-[#CDE4F7] pt-3">
+                              <span className="text-sm font-semibold text-slate-700">
+                                Total transport (aller + retour)
+                              </span>
+                              <span className="text-right text-sm font-bold text-slate-900">
+                                {formatMoney(transportTotal)}
+                              </span>
+                            </div>
+
+                            <div className="mt-3 flex items-start justify-between gap-4">
+                              <span className="text-sm text-slate-500">
+                                Supplément hébergement retour
+                              </span>
+                              <span className="text-right text-sm font-semibold text-slate-900">
+                                {hasPricedFlowTotals
+                                  ? bookingFlow.totals.accommodationInbound ||
+                                    formatMoney(inboundAccommodationValue)
+                                  : formatMoney(inboundAccommodationValue)}
+                              </span>
+                            </div>
+                          </>
+                        )}
+                      </>
                     )}
 
                     <div className="mt-3 flex items-start justify-between gap-4">
@@ -1172,7 +1627,8 @@ export default function RecapitulatifPage() {
                       <span className="text-right text-sm font-semibold text-slate-900">
                         {discountLabel(
                           bookingFlow.search.bonificacion,
-                          outboundPricing.bonificationLabel
+                          outboundPricing.bonificationLabel ||
+                            bookingFlow.search.bonificacionLabel
                         )}
                       </span>
                     </div>

@@ -4,6 +4,7 @@ import {
   buildNasaTarificacionesSoapArgs,
   extractPricingVehiculoEntidad,
   extractNasaTarificacionesReturnMeta,
+  getFirstSalidaSoapEntity,
   nasaSalidasRequest,
   nasaTarificacionesRequest,
 } from "@/lib/armas/client";
@@ -263,6 +264,10 @@ export async function GET() {
         linesNorm.length > 0 &&
         !(armasCodigo && /^TF/i.test(armasCodigo.trim()));
 
+      const salidaEntidad = getFirstSalidaSoapEntity(
+        soapArgs.salidasEntidad.salidaEntidad
+      );
+
       rows.push({
         primaryCodigo: primary.codigoServicioVenta,
         primaryTipo: primary.tipoServicioVenta,
@@ -275,8 +280,7 @@ export async function GET() {
         total,
         tariffError: tariffError ?? null,
         soapArgs,
-        serviciosVentasEntidad:
-          soapArgs.salidasEntidad.salidaEntidad.serviciosVentasEntidad,
+        serviciosVentasSoap: salidaEntidad?.serviciosVentasEntidad ?? null,
         vehiculoEntidad,
         tarificacionesNormalized: linesNorm,
       });
