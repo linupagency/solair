@@ -4,6 +4,7 @@ import {
   buildNasaTarificacionesSoapArgs,
   extractPricingVehiculoEntidad,
   extractNasaTarificacionesReturnMeta,
+  getSalidaSoapEntityAt,
   nasaTarificacionesRequestWithSoapArgs,
   trailerVehiculoEntidadModeFromFlag,
 } from "@/lib/armas/client";
@@ -194,18 +195,19 @@ function buildTarificacionExecutionPlan(input: TarificacionRequestBody) {
   const primaryServiceLines = normalizeServiceLines(input.serviceLines);
   const returnServiceLines = normalizeServiceLines(input.returnServiceLines);
   const salidaRaw = soapArgs.salidasEntidad.salidaEntidad;
+  const outboundSalida = getSalidaSoapEntityAt(salidaRaw, 0);
+  const inboundSalida = getSalidaSoapEntityAt(salidaRaw, 1);
 
   if (primaryServiceLines?.length) {
-    const firstSalida = Array.isArray(salidaRaw) ? salidaRaw[0] : salidaRaw;
-    if (firstSalida) {
-      firstSalida.serviciosVentasEntidad = {
+    if (outboundSalida) {
+      outboundSalida.serviciosVentasEntidad = {
         servicioVentaEntidad: primaryServiceLines,
       };
     }
   }
 
-  if (returnServiceLines?.length && Array.isArray(salidaRaw) && salidaRaw[1]) {
-    salidaRaw[1].serviciosVentasEntidad = {
+  if (returnServiceLines?.length && inboundSalida) {
+    inboundSalida.serviciosVentasEntidad = {
       servicioVentaEntidad: returnServiceLines,
     };
   }

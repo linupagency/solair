@@ -135,7 +135,15 @@ export type NasaTarificacionesSoapArgs = {
 export function getFirstSalidaSoapEntity(
   value: SalidaSoapEntity | SalidaSoapEntity[]
 ): SalidaSoapEntity | undefined {
-  return Array.isArray(value) ? value[0] : value;
+  return getSalidaSoapEntityAt(value, 0);
+}
+
+export function getSalidaSoapEntityAt(
+  value: SalidaSoapEntity | SalidaSoapEntity[],
+  index: number
+): SalidaSoapEntity | undefined {
+  if (Array.isArray(value)) return value[index];
+  return index === 0 ? value : undefined;
 }
 
 function normalizeString(value: unknown) {

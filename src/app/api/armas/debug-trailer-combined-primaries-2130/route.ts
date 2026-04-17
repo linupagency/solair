@@ -4,6 +4,7 @@ import {
   buildNasaTarificacionesSoapArgs,
   extractPricingVehiculoEntidad,
   extractNasaTarificacionesReturnMeta,
+  getFirstSalidaSoapEntity,
   nasaSalidasRequest,
   nasaTarificacionesRequest,
 } from "@/lib/armas/client";
@@ -263,27 +264,26 @@ export async function GET() {
         linesNorm.length > 0 &&
         !(armasCodigo && /^TF/i.test(armasCodigo.trim()));
 
- const salidaEntidadRaw = soapArgs.salidasEntidad?.salidaEntidad;
-const salidaEntidad = Array.isArray(salidaEntidadRaw)
-  ? salidaEntidadRaw[0]
-  : salidaEntidadRaw;
+      const salidaEntidad = getFirstSalidaSoapEntity(
+        soapArgs.salidasEntidad.salidaEntidad
+      );
 
-rows.push({
-  primaryCodigo: primary.codigoServicioVenta,
-  primaryTipo: primary.tipoServicioVenta,
-  companionCodigo: SCENARIO.companionCodigo,
-  companionTipo: SCENARIO.companionTipo,
-  presentOnSalida: ouiNon(presentOnSalida),
-  availableOnSalida: ouiNon(!!availableOnSalida),
-  armasCodigo: armasCodigo ?? null,
-  armasTexto: armasTexto ?? null,
-  total,
-  tariffError: tariffError ?? null,
-  soapArgs,
-  serviciosVentasSoap: salidaEntidad?.serviciosVentasEntidad ?? null,
-  vehiculoEntidad,
-  tarificacionesNormalized: linesNorm,
-});
+      rows.push({
+        primaryCodigo: primary.codigoServicioVenta,
+        primaryTipo: primary.tipoServicioVenta,
+        companionCodigo: SCENARIO.companionCodigo,
+        companionTipo: SCENARIO.companionTipo,
+        presentOnSalida: ouiNon(presentOnSalida),
+        availableOnSalida: ouiNon(!!availableOnSalida),
+        armasCodigo: armasCodigo ?? null,
+        armasTexto: armasTexto ?? null,
+        total,
+        tariffError: tariffError ?? null,
+        soapArgs,
+        serviciosVentasSoap: salidaEntidad?.serviciosVentasEntidad ?? null,
+        vehiculoEntidad,
+        tarificacionesNormalized: linesNorm,
+      });
     }
 
     return NextResponse.json({

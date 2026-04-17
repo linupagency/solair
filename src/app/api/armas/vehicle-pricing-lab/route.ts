@@ -11,6 +11,7 @@ import {
   buildNasaTarificacionesSoapArgs,
   extractNasaTarificacionesReturnMeta,
   extractPricingVehiculoEntidad,
+  getFirstSalidaSoapEntity,
   nasaTarificacionesRequest,
 } from "@/lib/armas/client";
 import { sumPrecioTotalFromNasaTarificacionesResult } from "@/lib/armas/tarificacion-normalize";
@@ -147,6 +148,9 @@ export async function GET(request: NextRequest) {
     } catch (e) {
       tariffError = e instanceof Error ? e.message : String(e);
     }
+    const salidaEntidad = getFirstSalidaSoapEntity(
+      soapArgs.salidasEntidad.salidaEntidad
+    );
 
     rows.push({
       scenario,
@@ -155,8 +159,7 @@ export async function GET(request: NextRequest) {
       normalizedVehicleJson:
         norm.ok && norm.presence === "vehicle" ? norm.vehicle : null,
       requestBody: postBody,
-      serviciosVentasSoap:
-        soapArgs.salidasEntidad?.salidaEntidad?.serviciosVentasEntidad,
+      serviciosVentasSoap: salidaEntidad?.serviciosVentasEntidad ?? null,
       vehiculoEntidad: veh,
       armasCodigo,
       armasTexto,

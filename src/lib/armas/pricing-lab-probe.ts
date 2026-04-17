@@ -5,6 +5,7 @@ import type { TarificacionRequestBody } from "@/lib/armas/tarificacion-request-t
 import {
   buildNasaTarificacionesSoapArgs,
   extractNasaTarificacionesReturnMeta,
+  getFirstSalidaSoapEntity,
   type NasaTarificacionesRequestParams,
   type NasaTarificacionesSoapArgs,
 } from "@/lib/armas/client";
@@ -106,17 +107,16 @@ export function mergeProbeSoapOverrides(
   if (!overrides) return merged;
 
   if (overrides.serviciosVentasEntidad) {
-    const salidaEntidadRaw = merged.salidasEntidad?.salidaEntidad;
-    const salidaEntidad = Array.isArray(salidaEntidadRaw)
-      ? salidaEntidadRaw[0]
-      : salidaEntidadRaw;
-
-      if (salidaEntidad) {
-        salidaEntidad.serviciosVentasEntidad = {
-          servicioVentaEntidad:
-            overrides.serviciosVentasEntidad.servicioVentaEntidad as any,
-        };
-      }
+    const salidaEntidad = getFirstSalidaSoapEntity(
+      merged.salidasEntidad.salidaEntidad
+    );
+    if (salidaEntidad) {
+      salidaEntidad.serviciosVentasEntidad = {
+        servicioVentaEntidad:
+          overrides.serviciosVentasEntidad
+            .servicioVentaEntidad as typeof salidaEntidad.serviciosVentasEntidad.servicioVentaEntidad,
+      };
+    }
   }
 
   if (overrides.paxsVehsEntidad) {
