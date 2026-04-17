@@ -9,7 +9,7 @@ import {
 } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { HomeMaritimeHeader, HomePromoOffers } from "@/components/home";
+import { HomeMaritimeHeader } from "@/components/home";
 import { DayPicker } from "react-day-picker";
 import "react-day-picker/style.css";
 import {
@@ -2395,8 +2395,6 @@ export default function HomePage() {
           </div>
         </div>
       </section>
-
-      <HomePromoOffers />
 
       <ResponsivePicker
         open={sheet === "origin"}
