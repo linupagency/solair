@@ -427,7 +427,7 @@ function DateAvailabilityPicker({
   availableDates: string[];
   placeholder: string;
   minDate?: string;
-  variant?: "default" | "desktop";
+  variant?: "default" | "desktop" | "desktopWide";
 }) {
   const [open, setOpen] = useState(false);
   const selectedDate = parseInputDate(value);
@@ -455,9 +455,11 @@ function DateAvailabilityPicker({
           setOpen((v) => !v);
         }}
         className={`w-full border border-slate-200 bg-white text-left text-slate-800 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100 ${
-          variant === "desktop"
-            ? "min-h-[52px] rounded-lg px-3.5 py-2.5 text-sm font-medium"
-            : "min-h-[48px] rounded-lg px-4 py-3 text-base"
+          variant === "desktopWide"
+            ? "min-h-[76px] rounded-[24px] px-6 py-4 text-[15px] font-medium shadow-sm"
+            : variant === "desktop"
+              ? "min-h-[52px] rounded-lg px-3.5 py-2.5 text-sm font-medium"
+              : "min-h-[48px] rounded-lg px-4 py-3 text-base"
         }`}
       >
         {loading
@@ -645,19 +647,29 @@ function SelectionButton({
 }: {
   label: string;
   onClick: () => void;
-  variant?: "default" | "desktop";
+  variant?: "default" | "desktop" | "desktopWide";
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
       className={`w-full border border-slate-200 bg-white text-left text-sm font-medium text-slate-800 transition hover:border-slate-300 hover:bg-slate-50 ${
-        variant === "desktop"
-          ? "min-h-[52px] rounded-lg px-3.5 py-2.5"
-          : "min-h-[48px] rounded-lg px-3.5 py-2.5"
+        variant === "desktopWide"
+          ? "min-h-[76px] rounded-[24px] px-6 py-4 text-[15px] shadow-sm"
+          : variant === "desktop"
+            ? "min-h-[52px] rounded-lg px-3.5 py-2.5"
+            : "min-h-[48px] rounded-lg px-3.5 py-2.5"
       }`}
     >
-      <span className={variant === "desktop" ? "block truncate" : "block"}>
+      <span
+        className={
+          variant === "desktopWide"
+            ? "block leading-tight"
+            : variant === "desktop"
+              ? "block truncate"
+              : "block"
+        }
+      >
         {label}
       </span>
     </button>
@@ -675,7 +687,7 @@ function DesktopSearchField({
   title: string;
   subtitle?: string;
   children: ReactNode;
-  layout?: "card" | "panel";
+  layout?: "card" | "panel" | "heroCard";
 }) {
   if (layout === "panel") {
     return (
@@ -690,6 +702,25 @@ function DesktopSearchField({
             </p>
             {subtitle ? (
               <p className="mt-0.5 truncate text-xs text-slate-500">{subtitle}</p>
+            ) : null}
+          </div>
+        </div>
+        <div className="mt-auto min-w-0">{children}</div>
+      </div>
+    );
+  }
+
+  if (layout === "heroCard") {
+    return (
+      <div className="flex min-h-[224px] min-w-0 flex-col rounded-[32px] bg-[#F3F5F8] px-7 py-7">
+        <div className="mb-5 flex items-start gap-4">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white text-[#163B6D] shadow-sm [&_svg]:h-6 [&_svg]:w-6">
+            {icon}
+          </div>
+          <div className="min-w-0">
+            <p className="text-[15px] font-bold text-[#223556]">{title}</p>
+            {subtitle ? (
+              <p className="mt-1 text-[14px] text-slate-500">{subtitle}</p>
             ) : null}
           </div>
         </div>
@@ -1838,7 +1869,7 @@ export default function HomePage() {
 
           <div
             id="reservation-form"
-            className="relative z-[2] mx-auto mt-6 w-full max-w-[1080px] sm:mt-8 sm:-translate-y-1 lg:mt-10 lg:-translate-y-2"
+            className="relative z-[2] mx-auto mt-6 w-full max-w-[1520px] sm:mt-8 sm:-translate-y-1 lg:mt-10 lg:-translate-y-2"
           >
             <div className="overflow-visible rounded-lg border border-white/45 bg-white/95 shadow-md backdrop-blur-[2px]">
               <form
@@ -1859,188 +1890,196 @@ export default function HomePage() {
 
                 {!loadingPorts && !portsError && (
                   <>
-                    {/* Desktop large — moteur horizontal type ferry */}
-                    <div className="hidden overflow-hidden rounded-lg border border-slate-200 bg-white xl:block">
-                      <div className="border-b border-slate-200 bg-slate-50 px-5 py-3">
-                        <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
-                          Options de billets
+                    {/* Desktop large — version 2 plus large */}
+                    <div className="hidden rounded-[36px] bg-white p-8 shadow-[0_20px_60px_rgba(15,23,42,0.12)] xl:block">
+                      <div className="flex items-end justify-between gap-8">
+                        <div>
+                          <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
+                            Options de billets
+                          </p>
+                          <div className="mt-3">
+                            <TripTypeToggle
+                              value={tripType}
+                              onChange={handleTripTypeChange}
+                              variant="light"
+                              buttonOrder="round_trip_first"
+                            />
+                          </div>
+                        </div>
+                        <p className="max-w-xl text-right text-sm leading-relaxed text-slate-500">
+                          Dates réelles, ports compatibles et options de voyage
+                          alignés sur les réponses du réseau.
                         </p>
-                        <div className="mt-2 max-w-md">
-                          <TripTypeToggle
-                            value={tripType}
-                            onChange={handleTripTypeChange}
-                            variant="light"
-                            buttonOrder="round_trip_first"
+                      </div>
+
+                      <div className="mt-7 grid gap-5 xl:grid-cols-4">
+                        <DesktopSearchField
+                          layout="heroCard"
+                          icon={<ShipIcon />}
+                          title="Origine"
+                          subtitle={
+                            selectedOrigin?.textoCorto || "Choisissez un port"
+                          }
+                        >
+                          <SelectionButton
+                            variant="desktopWide"
+                            label={
+                              selectedOrigin
+                                ? `${selectedOrigin.textoCorto} (${selectedOrigin.codigoPuerto})`
+                                : "Choisir un port de départ"
+                            }
+                            onClick={() => setSheet("origin")}
                           />
-                        </div>
-                      </div>
+                        </DesktopSearchField>
 
-                      <div className="border-b border-slate-200">
-                        <p className="px-5 pt-4 text-xs font-bold uppercase tracking-wide text-slate-500">
-                          Destination et dates
-                        </p>
-                        <div className="mt-1 grid min-w-0 divide-y divide-slate-200 xl:grid-cols-4 xl:divide-x xl:divide-y-0">
-                          <DesktopSearchField
-                            layout="panel"
-                            icon={<ShipIcon />}
-                            title="Origine"
-                            subtitle={
-                              selectedOrigin?.textoCorto || "Choisissez un port"
+                        <DesktopSearchField
+                          layout="heroCard"
+                          icon={<ShipIcon />}
+                          title="Destination"
+                          subtitle={
+                            selectedDestination?.textoCorto ||
+                            "Choisissez une destination"
+                          }
+                        >
+                          <SelectionButton
+                            variant="desktopWide"
+                            label={
+                              selectedDestination
+                                ? `${selectedDestination.textoCorto} (${selectedDestination.codigoPuerto})`
+                                : "Choisir une destination"
                             }
-                          >
-                            <SelectionButton
-                              variant="desktop"
-                              label={
-                                selectedOrigin
-                                  ? `${selectedOrigin.textoCorto} (${selectedOrigin.codigoPuerto})`
-                                  : "Choisir un port de départ"
-                              }
-                              onClick={() => setSheet("origin")}
-                            />
-                          </DesktopSearchField>
+                            onClick={() => setSheet("destination")}
+                          />
+                        </DesktopSearchField>
 
-                          <DesktopSearchField
-                            layout="panel"
-                            icon={<ShipIcon />}
-                            title="Destination"
-                            subtitle={
-                              selectedDestination?.textoCorto ||
-                              "Choisissez une destination"
+                        <DesktopSearchField
+                          layout="heroCard"
+                          icon={<CalendarIcon />}
+                          title="Date aller"
+                          subtitle={
+                            dateIda
+                              ? formatDisplayDate(dateIda)
+                              : "Choisissez une date"
+                          }
+                        >
+                          <DateAvailabilityPicker
+                            value={dateIda}
+                            onChange={setDateIda}
+                            disabled={
+                              !origen || !destino || loadingOutboundDates
                             }
-                          >
-                            <SelectionButton
-                              variant="desktop"
-                              label={
-                                selectedDestination
-                                  ? `${selectedDestination.textoCorto} (${selectedDestination.codigoPuerto})`
-                                  : "Choisir une destination"
-                              }
-                              onClick={() => setSheet("destination")}
-                            />
-                          </DesktopSearchField>
+                            loading={loadingOutboundDates}
+                            availableDates={availableOutboundDates}
+                            placeholder="Choisissez une date"
+                            variant="desktopWide"
+                          />
+                        </DesktopSearchField>
 
-                          <DesktopSearchField
-                            layout="panel"
-                            icon={<CalendarIcon />}
-                            title="Date aller"
-                            subtitle={
-                              dateIda
-                                ? formatDisplayDate(dateIda)
+                        <DesktopSearchField
+                          layout="heroCard"
+                          icon={<CalendarIcon />}
+                          title="Date retour"
+                          subtitle={
+                            tripType === "round_trip"
+                              ? dateVuelta
+                                ? formatDisplayDate(dateVuelta)
                                 : "Choisissez une date"
+                              : "Non applicable"
+                          }
+                        >
+                          <DateAvailabilityPicker
+                            value={dateVuelta}
+                            onChange={setDateVuelta}
+                            disabled={
+                              tripType !== "round_trip" ||
+                              !origen ||
+                              !destino ||
+                              !dateIda ||
+                              loadingInboundDates
                             }
-                          >
-                            <DateAvailabilityPicker
-                              value={dateIda}
-                              onChange={setDateIda}
-                              disabled={
-                                !origen || !destino || loadingOutboundDates
-                              }
-                              loading={loadingOutboundDates}
-                              availableDates={availableOutboundDates}
-                              placeholder="Choisissez une date"
-                              variant="desktop"
-                            />
-                          </DesktopSearchField>
-
-                          <DesktopSearchField
-                            layout="panel"
-                            icon={<CalendarIcon />}
-                            title="Date retour"
-                            subtitle={
-                              tripType === "round_trip"
-                                ? dateVuelta
-                                  ? formatDisplayDate(dateVuelta)
-                                  : "Choisissez une date"
-                                : "Non applicable"
-                            }
-                          >
-                            <DateAvailabilityPicker
-                              value={dateVuelta}
-                              onChange={setDateVuelta}
-                              disabled={
-                                tripType !== "round_trip" ||
-                                !origen ||
-                                !destino ||
-                                !dateIda ||
-                                loadingInboundDates
-                              }
-                              loading={loadingInboundDates}
-                              availableDates={inboundDateOptions}
-                              placeholder="Choisissez une date"
-                              minDate={dateIda || undefined}
-                              variant="desktop"
-                            />
-                          </DesktopSearchField>
-                        </div>
+                            loading={loadingInboundDates}
+                            availableDates={inboundDateOptions}
+                            placeholder="Choisissez une date"
+                            minDate={dateIda || undefined}
+                            variant="desktopWide"
+                          />
+                        </DesktopSearchField>
                       </div>
 
-                      <div className="border-b border-slate-200 px-5 py-4">
-                        <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
-                          Passagers et transport véhicule
-                        </p>
-                        <div className="mt-3 flex min-w-0 flex-col gap-4 xl:flex-row xl:items-stretch">
-                          <div className="min-w-0 flex-1">
-                            <DesktopSearchField
-                              layout="panel"
-                              icon={<UserIcon />}
-                              title="Passagers"
-                              subtitle={getPassengerSummary(passengers)}
-                            >
-                              <SelectionButton
-                                variant="desktop"
-                                label={`${totalPassengers} passager${totalPassengers > 1 ? "s" : ""}`}
-                                onClick={() => setSheet("passengers")}
-                              />
-                            </DesktopSearchField>
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <DesktopSearchField
-                              layout="panel"
-                              icon={<CarIcon />}
-                              title="Transport véhicule"
-                              subtitle={getVehicleSummary(vehicleSelections)}
-                            >
-                              <SelectionButton
-                                variant="desktop"
-                                label={getVehicleSummary(vehicleSelections)}
-                                onClick={openVehicleSheet}
-                              />
-                            </DesktopSearchField>
-                          </div>
-                          <div className="flex min-w-0 shrink-0 flex-col justify-end xl:w-52">
-                            <button
-                              type="submit"
-                              disabled={!canSearch}
-                              className="inline-flex min-h-[52px] w-full items-center justify-center rounded-md bg-[#163B6D] px-4 py-3.5 text-center text-base font-bold text-white shadow-sm transition hover:bg-[#0f2d55] focus-visible:outline focus-visible:ring-2 focus-visible:ring-[#163B6D]/45 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-400"
-                            >
-                              Rechercher
-                            </button>
-                          </div>
-                        </div>
-                      </div>
+                      <div className="mt-5 grid gap-5 xl:grid-cols-4">
+                        <DesktopSearchField
+                          layout="heroCard"
+                          icon={<UserIcon />}
+                          title="Passagers"
+                          subtitle={getPassengerSummary(passengers)}
+                        >
+                          <SelectionButton
+                            variant="desktopWide"
+                            label={`${totalPassengers} passager${totalPassengers > 1 ? "s" : ""}`}
+                            onClick={() => setSheet("passengers")}
+                          />
+                        </DesktopSearchField>
 
-                      <div className="flex flex-col gap-2 bg-slate-50 px-5 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-6 sm:gap-y-2">
-                        <span className="text-xs font-bold uppercase tracking-wide text-slate-500">
-                          Plus d’options
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => setSheet("animals")}
-                          className="min-h-[44px] text-left text-sm font-semibold text-[#163B6D] underline decoration-[#163B6D]/30 underline-offset-2 transition hover:decoration-[#163B6D] focus-visible:outline focus-visible:ring-2 focus-visible:ring-[#163B6D]/35 focus-visible:ring-offset-2"
+                        <DesktopSearchField
+                          layout="heroCard"
+                          icon={<PawIcon />}
+                          title="Animaux"
+                          subtitle={getAnimalsSummary(animals)}
                         >
-                          Animaux — {getAnimalsSummary(animals)}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setSheet("discount")}
-                          className="min-h-[44px] text-left text-sm font-semibold text-[#163B6D] underline decoration-[#163B6D]/30 underline-offset-2 transition hover:decoration-[#163B6D] focus-visible:outline focus-visible:ring-2 focus-visible:ring-[#163B6D]/35 focus-visible:ring-offset-2"
+                          <SelectionButton
+                            variant="desktopWide"
+                            label={getAnimalsSummary(animals)}
+                            onClick={() => setSheet("animals")}
+                          />
+                        </DesktopSearchField>
+
+                        <DesktopSearchField
+                          layout="heroCard"
+                          icon={<CarIcon />}
+                          title="Véhicules"
+                          subtitle={getVehicleSummary(vehicleSelections)}
                         >
-                          Réduction —{" "}
-                          {getDiscountLabel(
+                          <SelectionButton
+                            variant="desktopWide"
+                            label={getVehicleSummary(vehicleSelections)}
+                            onClick={openVehicleSheet}
+                          />
+                        </DesktopSearchField>
+
+                        <DesktopSearchField
+                          layout="heroCard"
+                          icon={<TagIcon />}
+                          title="Réduction"
+                          subtitle={getDiscountLabel(
                             discountMode,
                             availableDiscounts,
                             discountModeLabel
                           )}
+                        >
+                          <SelectionButton
+                            variant="desktopWide"
+                            label={getDiscountLabel(
+                              discountMode,
+                              availableDiscounts,
+                              discountModeLabel
+                            )}
+                            onClick={() => setSheet("discount")}
+                          />
+                        </DesktopSearchField>
+                      </div>
+
+                      <div className="mt-7 flex items-end justify-between gap-8">
+                        <p className="max-w-3xl text-sm leading-relaxed text-slate-500">
+                          Le client choisit uniquement des ports compatibles,
+                          des dates réellement ouvertes à la réservation et des
+                          options disponibles pour la traversée sélectionnée.
+                        </p>
+                        <button
+                          type="submit"
+                          disabled={!canSearch}
+                          className="inline-flex min-h-[76px] min-w-[420px] items-center justify-center rounded-[28px] bg-[#F2993A] px-8 py-5 text-center text-[1.05rem] font-bold text-white shadow-[0_14px_30px_rgba(242,153,58,0.28)] transition hover:bg-[#eb8a22] focus-visible:outline focus-visible:ring-2 focus-visible:ring-[#F2993A]/45 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-400 disabled:shadow-none"
+                        >
+                          Voir les traversées et prix
                         </button>
                       </div>
                     </div>
