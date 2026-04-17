@@ -43,7 +43,7 @@ export function HomeMaritimeHeader({
             <img
               src="/logo-solair-voyages.png"
               alt="Solair Voyages"
-              className="h-9 w-auto sm:h-10"
+              className="h-10 w-auto sm:h-11"
             />
           </Link>
 

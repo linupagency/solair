@@ -163,9 +163,9 @@ const VEHICLE_UI_ROWS: VehicleUiRow[] = [
  * Tu peux modifier ici les libellés et les liens visibles en haut du site.
  */
 const HOME_HEADER_LINKS: HomeHeaderLink[] = [
+  { label: "Accueil", href: "https://solair-voyages.com" },
   { label: "Réserver", href: "#reservation-form" },
-  { label: "Gérer ma réservation", href: "/retrouver-ma-reservation" },
-  { label: "Horaires & tarifs", href: "#reservation-form" },
+  { label: "Nous contacter", href: "https://solair-voyages.com/contact/" },
 ];
 
 const HOME_HEADER_TOP_LINKS: HomeHeaderLink[] = [
