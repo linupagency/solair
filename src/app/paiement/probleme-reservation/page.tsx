@@ -41,6 +41,9 @@ function ProblemeReservationContent() {
   const captureID = searchParams.get("captureID") || "-";
   const amount = searchParams.get("amount") || "-";
   const currency = searchParams.get("currency") || "EUR";
+  const testMode = searchParams.get("testMode") === "1";
+  const testEmailsSent = searchParams.get("testEmailsSent") === "1";
+  const testEmailError = searchParams.get("testEmailError") || "";
 
   const origen = searchParams.get("origen") || "-";
   const destino = searchParams.get("destino") || "-";
@@ -59,12 +62,14 @@ function ProblemeReservationContent() {
             Solair Voyages
           </p>
           <h1 className="mt-2 text-3xl font-bold text-white">
-            Paiement reçu, réservation en attente
+            {testMode
+              ? "Paiement test reçu, réservation réelle non envoyée"
+              : "Paiement reçu, réservation en attente"}
           </h1>
           <p className="mt-2 max-w-3xl text-sm text-white/85">
-            Le paiement a bien été capturé, mais la réservation n’a pas encore été
-            finalisée automatiquement côté transporteur. Le dossier doit être
-            vérifié avant confirmation définitive.
+            {testMode
+              ? "Le paiement PayPal sandbox a bien été capturé. Le retour de paiement a donc été testé correctement, mais aucune réservation réelle n’a été envoyée au transporteur tant que le mode production reste désactivé."
+              : "Le paiement a bien été capturé, mais la réservation n’a pas encore été finalisée automatiquement côté transporteur. Le dossier doit être vérifié avant confirmation définitive."}
           </p>
         </div>
       </section>
@@ -75,14 +80,38 @@ function ProblemeReservationContent() {
             <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_10px_28px_rgba(15,23,42,0.05)] sm:p-6">
               <div className="rounded-2xl bg-[#FBE9E7] p-4 ring-1 ring-[#E9B8B2]">
                 <p className="text-sm font-semibold text-[#1F2F46]">
-                  Action requise
+                  {testMode ? "Mode test confirmé" : "Action requise"}
                 </p>
                 <p className="mt-2 text-sm text-slate-600">
-                  Le paiement est validé, mais la réservation Armas n’a pas encore
-                  été créée automatiquement. Cette page sert à traiter proprement
-                  ce cas sensible, sans afficher une fausse confirmation au client.
+                  {testMode
+                    ? "Le paiement est bien validé et le parcours de retour fonctionne. Cette page confirme simplement que la réservation réelle reste volontairement bloquée pendant les tests."
+                    : "Le paiement est validé, mais la réservation n’a pas encore été créée automatiquement. Cette page sert à traiter proprement ce cas sensible, sans afficher une fausse confirmation au client."}
                 </p>
               </div>
+
+              {testMode && (
+                <div
+                  className={`mt-4 rounded-2xl p-4 ring-1 ${
+                    testEmailsSent
+                      ? "bg-[#EEF9F0] ring-[#B9E3C1]"
+                      : "bg-[#FFF7ED] ring-[#F5D1A3]"
+                  }`}
+                >
+                  <p className="text-sm font-semibold text-[#1F2F46]">
+                    Emails de test
+                  </p>
+                  <p className="mt-2 text-sm text-slate-600">
+                    {testEmailsSent
+                      ? "Les deux emails de test ont bien été envoyés : un au client et un à Solair Voyages."
+                      : "Le retour de paiement est validé, mais l’envoi des emails de test n’a pas encore abouti."}
+                  </p>
+                  {!testEmailsSent && testEmailError ? (
+                    <p className="mt-2 break-words text-sm text-[#9A3412]">
+                      Détail : {testEmailError}
+                    </p>
+                  ) : null}
+                </div>
+              )}
 
               <div className="mt-6 grid gap-4 md:grid-cols-2">
                 <InfoCard
@@ -112,9 +141,19 @@ function ProblemeReservationContent() {
                   Recommandation de traitement
                 </p>
                 <ul className="mt-3 space-y-2 text-sm text-slate-600">
-                  <li>Vérifier manuellement la disponibilité et l’état de la réservation.</li>
-                  <li>Créer la réservation transporteur uniquement après contrôle.</li>
-                  <li>Si la réservation est impossible, traiter le dossier selon la procédure de remboursement ou de support.</li>
+                  {testMode ? (
+                    <>
+                      <li>Vérifier que le retour PayPal sandbox affiche bien les bonnes informations.</li>
+                      <li>Confirmer ensuite l’activation du mode production seulement quand vous voudrez ouvrir les ventes réelles.</li>
+                      <li>Tant que le mode test reste actif, aucune réservation réelle ne partira côté transporteur.</li>
+                    </>
+                  ) : (
+                    <>
+                      <li>Vérifier manuellement la disponibilité et l’état de la réservation.</li>
+                      <li>Créer la réservation transporteur uniquement après contrôle.</li>
+                      <li>Si la réservation est impossible, traiter le dossier selon la procédure de remboursement ou de support.</li>
+                    </>
+                  )}
                 </ul>
               </div>
             </section>
@@ -136,8 +175,9 @@ function ProblemeReservationContent() {
                   Statut actuel
                 </p>
                 <p className="mt-2 text-sm text-slate-600">
-                  Paiement PayPal confirmé, réservation transporteur non finalisée
-                  automatiquement.
+                  {testMode
+                    ? "Paiement PayPal sandbox confirmé, réservation réelle volontairement non envoyée."
+                    : "Paiement PayPal confirmé, réservation transporteur non finalisée automatiquement."}
                 </p>
               </div>
 

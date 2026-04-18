@@ -92,6 +92,9 @@ import {
       totalEuros,
       serviceCode,
       serviceType,
+      codigoTarifa: normalizeString(raw.codigoTarifa),
+      tarifaLabel: normalizeString(raw.tarifaLabel),
+      bonificationLabel: normalizeString(raw.bonificationLabel),
       rawPricingResponse: raw.rawPricingResponse,
     };
   }

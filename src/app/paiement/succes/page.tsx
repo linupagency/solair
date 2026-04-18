@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
@@ -82,6 +83,9 @@ type BookingResponse = {
   };
 };
 
+const REAL_BOOKING_ENABLED =
+  process.env.NEXT_PUBLIC_ENABLE_REAL_BOOKING === "true";
+
 function buildConfirmationUrl(params: {
   codigoLocata: string;
   total: string;
@@ -123,6 +127,9 @@ function buildProblemReservationUrl(params: {
   nombre: string;
   apellido1: string;
   passengersData?: Traveler[];
+  testMode?: boolean;
+  testEmailsSent?: boolean;
+  testEmailError?: string;
 }) {
   const query = new URLSearchParams({
     orderID: params.orderID,
@@ -139,6 +146,18 @@ function buildProblemReservationUrl(params: {
 
   if (params.passengersData && params.passengersData.length > 0) {
     query.set("passengersData", JSON.stringify(params.passengersData));
+  }
+
+  if (params.testMode) {
+    query.set("testMode", "1");
+  }
+
+  if (typeof params.testEmailsSent === "boolean") {
+    query.set("testEmailsSent", params.testEmailsSent ? "1" : "0");
+  }
+
+  if (params.testEmailError) {
+    query.set("testEmailError", params.testEmailError);
   }
 
   return `/paiement/probleme-reservation?${query.toString()}`;
@@ -243,6 +262,65 @@ function PaiementSuccesContent() {
           );
         }
 
+        if (!REAL_BOOKING_ENABLED) {
+          setStep("Retour de paiement validé en mode test...");
+
+          let testEmailsSent = false;
+          let testEmailError = "";
+
+          try {
+            const testEmailResponse = await fetch(
+              "/api/booking/send-test-emails-after-payment",
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  draftId,
+                  capturedAmount: captureJson.amount || draftPayload.total || "",
+                }),
+              }
+            );
+
+            const testEmailJson = (await testEmailResponse.json()) as {
+              ok?: boolean;
+              message?: string;
+            };
+
+            testEmailsSent = Boolean(testEmailResponse.ok && testEmailJson.ok);
+            testEmailError =
+              !testEmailsSent && typeof testEmailJson.message === "string"
+                ? testEmailJson.message
+                : "";
+          } catch (err) {
+            testEmailError =
+              err instanceof Error
+                ? err.message
+                : "Erreur inconnue pendant l’envoi des emails de test.";
+          }
+
+          router.replace(
+            buildProblemReservationUrl({
+              orderID: captureJson.orderID || token,
+              captureID: captureJson.captureID || "",
+              amount: captureJson.amount || draftPayload.total || "",
+              currency: captureJson.currency || "EUR",
+              origen: draftPayload.origen,
+              destino: draftPayload.destino,
+              fechaSalida: draftPayload.fechaSalida,
+              horaSalida: draftPayload.horaSalida,
+              nombre: draftPayload.nombre,
+              apellido1: draftPayload.apellido1,
+              passengersData: draftPayload.passengersData,
+              testMode: true,
+              testEmailsSent,
+              testEmailError,
+            })
+          );
+          return;
+        }
+
         setStep("Création de la réservation transporteur...");
 
         const bookingResponse = await fetch(
@@ -279,6 +357,7 @@ function PaiementSuccesContent() {
               nombre: draftPayload.nombre,
               apellido1: draftPayload.apellido1,
               passengersData: draftPayload.passengersData,
+              testMode: false,
             })
           );
           return;
@@ -373,12 +452,12 @@ function PaiementSuccesContent() {
                 </div>
 
                 <div className="mt-6">
-                  <a
+                  <Link
                     href="/"
                     className="inline-flex rounded-[22px] border border-slate-300 px-5 py-3 text-base font-bold text-slate-900 transition hover:bg-slate-50"
                   >
                     Retour à l’accueil
-                  </a>
+                  </Link>
                 </div>
               </>
             )}

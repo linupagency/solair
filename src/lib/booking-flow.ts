@@ -133,6 +133,9 @@ export type BookingRoundTripSelectedPricing = {
   totalEuros: number;
   serviceCode: string;
   serviceType: string;
+  codigoTarifa?: string;
+  tarifaLabel?: string;
+  bonificationLabel?: string;
   rawPricingResponse?: unknown;
 };
 

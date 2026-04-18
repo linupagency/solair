@@ -57,6 +57,45 @@ type VehicleForm = BookingVehicleSelection & {
   id: string;
 };
 
+const NATIONALITY_OPTIONS = [
+  { value: "FR", label: "France" },
+  { value: "ES", label: "Espagne" },
+  { value: "MA", label: "Maroc" },
+  { value: "DZ", label: "Algérie" },
+  { value: "TN", label: "Tunisie" },
+  { value: "BE", label: "Belgique" },
+  { value: "CH", label: "Suisse" },
+  { value: "LU", label: "Luxembourg" },
+  { value: "MC", label: "Monaco" },
+  { value: "AD", label: "Andorre" },
+  { value: "IT", label: "Italie" },
+  { value: "DE", label: "Allemagne" },
+  { value: "PT", label: "Portugal" },
+  { value: "NL", label: "Pays-Bas" },
+  { value: "GB", label: "Royaume-Uni" },
+  { value: "IE", label: "Irlande" },
+  { value: "AT", label: "Autriche" },
+  { value: "SE", label: "Suède" },
+  { value: "NO", label: "Norvège" },
+  { value: "DK", label: "Danemark" },
+  { value: "FI", label: "Finlande" },
+  { value: "PL", label: "Pologne" },
+  { value: "CZ", label: "République tchèque" },
+  { value: "SK", label: "Slovaquie" },
+  { value: "HU", label: "Hongrie" },
+  { value: "RO", label: "Roumanie" },
+  { value: "BG", label: "Bulgarie" },
+  { value: "GR", label: "Grèce" },
+  { value: "TR", label: "Turquie" },
+  { value: "US", label: "États-Unis" },
+  { value: "CA", label: "Canada" },
+  { value: "BR", label: "Brésil" },
+  { value: "SN", label: "Sénégal" },
+  { value: "CI", label: "Côte d’Ivoire" },
+  { value: "CM", label: "Cameroun" },
+  { value: "ML", label: "Mali" },
+];
+
 function normalizeArray<T>(value?: T[] | T): T[] {
   if (!value) return [];
   return Array.isArray(value) ? value : [value];
@@ -164,6 +203,36 @@ function normalizeBirthDateInput(value: string) {
   }
 
   return v;
+}
+
+function formatPartialDateInput(value: string) {
+  const digits = value.replace(/\D/g, "").slice(0, 8);
+
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 4) {
+    return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+  }
+
+  return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+}
+
+function normalizeDateFieldInput(value: string) {
+  const v = value.trim();
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(v)) {
+    return v;
+  }
+
+  const digits = v.replace(/\D/g, "").slice(0, 8);
+
+  if (digits.length === 8) {
+    const dd = digits.slice(0, 2);
+    const mm = digits.slice(2, 4);
+    const yyyy = digits.slice(4, 8);
+    return `${yyyy}-${mm}-${dd}`;
+  }
+
+  return formatPartialDateInput(v);
 }
 
 function formatBirthDateForDisplay(value: string) {
@@ -609,22 +678,22 @@ export default function PassagersPage() {
 
   return (
     <main className="min-h-screen bg-[#F7F5F2] text-slate-900">
-      <section className="solair-hero pb-8 pt-5">
+      <section className="relative overflow-hidden bg-[radial-gradient(circle_at_10%_16%,rgb(44_166_164/0.24),transparent_17rem),radial-gradient(circle_at_88%_8%,rgb(242_140_40/0.3),transparent_18rem),radial-gradient(circle_at_78%_0%,rgb(217_74_58/0.2),transparent_14rem),linear-gradient(135deg,#102D54_0%,#163B6D_56%,#235392_100%)] pb-8 pt-5">
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
-          <div className="solair-stepbar mb-5">
-            <span className="solair-stepchip solair-stepchip--done">
+          <div className="mb-5 flex gap-2.5 overflow-x-auto pb-[0.35rem] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+            <span className="flex-none rounded-full bg-white px-[0.95rem] py-[0.58rem] text-xs font-bold leading-none tracking-[0.01em] text-[#163B6D] shadow-[0_6px_20px_rgba(12,36,67,0.12)]">
               1. Recherche
             </span>
-            <span className="solair-stepchip solair-stepchip--done">
+            <span className="flex-none rounded-full bg-white px-[0.95rem] py-[0.58rem] text-xs font-bold leading-none tracking-[0.01em] text-[#163B6D] shadow-[0_6px_20px_rgba(12,36,67,0.12)]">
               2. Traversées et prix
             </span>
-            <span className="solair-stepchip solair-stepchip--done">
+            <span className="flex-none rounded-full bg-white px-[0.95rem] py-[0.58rem] text-xs font-bold leading-none tracking-[0.01em] text-[#163B6D] shadow-[0_6px_20px_rgba(12,36,67,0.12)]">
               3. Hébergement
             </span>
-            <span className="solair-stepchip solair-stepchip--active">
+            <span className="flex-none rounded-full bg-[linear-gradient(135deg,#F28C28,#F7A744)] px-[0.95rem] py-[0.58rem] text-xs font-bold leading-none tracking-[0.01em] text-white shadow-[0_12px_28px_rgba(242,140,40,0.34)]">
               4. Passager
             </span>
-            <span className="solair-stepchip solair-stepchip--pending">
+            <span className="flex-none rounded-full border border-white/15 bg-white/12 px-[0.95rem] py-[0.58rem] text-xs font-bold leading-none tracking-[0.01em] text-white/95">
               5. Récapitulatif
             </span>
           </div>
@@ -645,7 +714,7 @@ export default function PassagersPage() {
             <button
               type="button"
               onClick={() => router.back()}
-              className="solair-secondary-btn px-4 py-3 text-sm font-semibold"
+              className="inline-flex justify-center rounded-2xl border border-white/25 bg-white/12 px-4 py-3 text-sm font-semibold text-white transition hover:-translate-y-px hover:bg-white/18"
             >
               Retour
             </button>
@@ -662,8 +731,8 @@ export default function PassagersPage() {
           >
             <div className="space-y-6">
               <SectionCard
-                title="Segments sélectionnés"
-                subtitle="Résumé du transport et de l’hébergement"
+                title="Votre voyage sélectionné"
+                subtitle="Retrouvez ici le résumé de votre traversée."
               >
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="rounded-2xl bg-[#F3F6F7] p-4">
@@ -716,6 +785,19 @@ export default function PassagersPage() {
                   flow.search.passengers,
                   index
                 );
+                const nationalityOptions = NATIONALITY_OPTIONS.some(
+                  (option) => option.value === traveler.codigoPais
+                )
+                  ? NATIONALITY_OPTIONS
+                  : traveler.codigoPais.trim()
+                    ? [
+                        {
+                          value: traveler.codigoPais.trim(),
+                          label: traveler.codigoPais.trim(),
+                        },
+                        ...NATIONALITY_OPTIONS,
+                      ]
+                    : NATIONALITY_OPTIONS;
 
                 return (
                   <SectionCard
@@ -730,8 +812,8 @@ export default function PassagersPage() {
                         Informations d&apos;identite
                       </p>
                       <p className="mt-1 text-sm text-slate-600">
-                        Renseignez les donnees du document comme sur le formulaire
-                        Armas.
+                        Renseignez les informations exactement comme sur votre
+                        pièce d’identité.
                       </p>
                     </div>
 
@@ -860,7 +942,7 @@ export default function PassagersPage() {
                             updateTraveler(
                               index,
                               "documentValidUntil",
-                              normalizeBirthDateInput(e.target.value)
+                              normalizeDateFieldInput(e.target.value)
                             )
                           }
                           placeholder="JJ/MM/AAAA"
@@ -877,7 +959,7 @@ export default function PassagersPage() {
                             updateTraveler(
                               index,
                               "fechaNacimiento",
-                              normalizeBirthDateInput(e.target.value)
+                              normalizeDateFieldInput(e.target.value)
                             )
                           }
                           placeholder="JJ/MM/AAAA"
@@ -886,20 +968,24 @@ export default function PassagersPage() {
                       </Field>
 
                       <Field label="Nationalite">
-                        <InputBase
-                          autoComplete="off"
-                          spellCheck={false}
+                        <SelectBase
                           value={traveler.codigoPais}
                           onChange={(e) =>
                             updateTraveler(
                               index,
                               "codigoPais",
-                              e.target.value.toUpperCase()
+                              e.target.value
                             )
                           }
-                          placeholder="Ex. FR"
                           hasError={submitted && !!errors?.codigoPais}
-                        />
+                        >
+                          <option value="">Choisir une nationalité</option>
+                          {nationalityOptions.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label} ({option.value})
+                            </option>
+                          ))}
+                        </SelectBase>
                       </Field>
 
                       <Field
@@ -1059,8 +1145,8 @@ export default function PassagersPage() {
 
             <aside className="space-y-6">
               <SectionCard
-                title="Vérification"
-                subtitle="Contrôle avant le récapitulatif."
+                title="Avant de continuer"
+                subtitle="Vérifiez les informations essentielles de votre dossier."
               >
                 <div className="space-y-4">
                   <div className="rounded-2xl bg-[#F4FAFF] p-4 ring-1 ring-[#CDE4F7]">
@@ -1081,12 +1167,8 @@ export default function PassagersPage() {
 
                   <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
                     <p className="text-sm text-slate-700">
-                      Selon la nouvelle réglementation des Bonifications pour les
-                      résidents non-péninsulaires et les familles nombreuses,
-                      adoptée dans la Loi de Finances Générale pour 2021, la
-                      réduction pour résidents sera indiquée et appliquée lors de
-                      la dernière étape du processus d&apos;achat, en même temps que
-                      les données de chaque passager.
+                      Les réductions éventuellement applicables seront précisées
+                      à l&apos;étape suivante, avec le détail de chaque voyageur.
                     </p>
                   </div>
 

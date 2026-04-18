@@ -645,7 +645,7 @@ export default function HebergementPage() {
       }
       const n = priced.totalEuros;
       if (n === null || !Number.isFinite(n)) {
-        throw new Error("Prix non renvoyé par Armas.");
+        throw new Error("Prix indisponible pour cette sélection.");
       }
       return n;
     },
@@ -697,7 +697,7 @@ export default function HebergementPage() {
       }
       const n = priced.totalEuros;
       if (n === null || !Number.isFinite(n)) {
-        throw new Error("Prix passager seul non renvoyé par Armas.");
+        throw new Error("Prix indisponible pour cette sélection passager.");
       }
       return n;
     },
@@ -1791,22 +1791,22 @@ export default function HebergementPage() {
 
   return (
     <main className="min-h-screen bg-[#F7F5F2] text-slate-900">
-      <section className="solair-hero pb-8 pt-5">
+      <section className="relative overflow-hidden bg-[radial-gradient(circle_at_10%_16%,rgb(44_166_164/0.24),transparent_17rem),radial-gradient(circle_at_88%_8%,rgb(242_140_40/0.3),transparent_18rem),radial-gradient(circle_at_78%_0%,rgb(217_74_58/0.2),transparent_14rem),linear-gradient(135deg,#102D54_0%,#163B6D_56%,#235392_100%)] pb-8 pt-5">
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
-          <div className="solair-stepbar mb-5">
-            <span className="solair-stepchip solair-stepchip--done">
+          <div className="mb-5 flex gap-2.5 overflow-x-auto pb-[0.35rem] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+            <span className="flex-none rounded-full bg-white px-[0.95rem] py-[0.58rem] text-xs font-bold leading-none tracking-[0.01em] text-[#163B6D] shadow-[0_6px_20px_rgba(12,36,67,0.12)]">
               1. Recherche
             </span>
-            <span className="solair-stepchip solair-stepchip--done">
+            <span className="flex-none rounded-full bg-white px-[0.95rem] py-[0.58rem] text-xs font-bold leading-none tracking-[0.01em] text-[#163B6D] shadow-[0_6px_20px_rgba(12,36,67,0.12)]">
               2. Traversées et prix
             </span>
-            <span className="solair-stepchip solair-stepchip--active">
+            <span className="flex-none rounded-full bg-[linear-gradient(135deg,#F28C28,#F7A744)] px-[0.95rem] py-[0.58rem] text-xs font-bold leading-none tracking-[0.01em] text-white shadow-[0_12px_28px_rgba(242,140,40,0.34)]">
               3. Hébergement
             </span>
-            <span className="solair-stepchip solair-stepchip--pending">
+            <span className="flex-none rounded-full border border-white/15 bg-white/12 px-[0.95rem] py-[0.58rem] text-xs font-bold leading-none tracking-[0.01em] text-white/95">
               4. Passager
             </span>
-            <span className="solair-stepchip solair-stepchip--pending">
+            <span className="flex-none rounded-full border border-white/15 bg-white/12 px-[0.95rem] py-[0.58rem] text-xs font-bold leading-none tracking-[0.01em] text-white/95">
               5. Récapitulatif
             </span>
           </div>
@@ -1829,7 +1829,7 @@ export default function HebergementPage() {
             <button
               type="button"
               onClick={() => router.back()}
-              className="solair-secondary-btn px-4 py-3 text-sm font-semibold"
+              className="inline-flex justify-center rounded-2xl border border-white/25 bg-white/12 px-4 py-3 text-sm font-semibold text-white transition hover:-translate-y-px hover:bg-white/18"
             >
               Retour
             </button>
@@ -2042,7 +2042,7 @@ export default function HebergementPage() {
                     </p>
                     {repricing ? (
                       <p className="mt-2 text-xs text-slate-500">
-                        Recalcul du tarif Armas…
+                        Mise à jour du tarif…
                       </p>
                     ) : null}
                   </div>

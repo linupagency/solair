@@ -127,7 +127,25 @@ function normalizeVehicleData(
   };
 }
 
+function isRealBookingEnabled() {
+  return (
+    process.env.ENABLE_REAL_BOOKING === "true" ||
+    process.env.NEXT_PUBLIC_ENABLE_REAL_BOOKING === "true"
+  );
+}
+
 export async function POST(request: NextRequest) {
+  if (!isRealBookingEnabled()) {
+    return NextResponse.json(
+      {
+        ok: false,
+        message:
+          "Le mode test est actif : la création réelle de réservation est bloquée tant que ENABLE_REAL_BOOKING n’est pas activé.",
+      },
+      { status: 403 }
+    );
+  }
+
   const validation = validateArmasBasicConfig();
 
   if (!validation.isValid) {
@@ -560,7 +578,7 @@ export async function POST(request: NextRequest) {
       });
 
       await sendBookingConfirmationEmail({
-        to: "reservations@solairvoyages.com",
+        to: "reservations@solair-voyages.com",
         codigoLocata,
         total,
         origen: payload.origen,

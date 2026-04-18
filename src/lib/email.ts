@@ -28,6 +28,7 @@ type BookingConfirmationEmailInput = {
     fechaSalida: string;
     horaSalida: string;
   };
+  mode?: "live" | "test";
 };
 
 function formatApiDate(value?: string) {
@@ -116,6 +117,8 @@ function buildTravelersText(travelers: Traveler[]) {
 }
 
 function buildEmailHtml(input: BookingConfirmationEmailInput) {
+  const isTestMode = input.mode === "test";
+
   return `
     <div style="background:#f8fafc;padding:32px 16px;font-family:Arial,sans-serif;color:#0f172a;">
       <div style="max-width:640px;margin:0 auto;background:#ffffff;border:1px solid #e2e8f0;border-radius:24px;overflow:hidden;">
@@ -124,18 +127,37 @@ function buildEmailHtml(input: BookingConfirmationEmailInput) {
             Solair Voyages
           </div>
           <h1 style="margin:12px 0 0;font-size:28px;line-height:1.2;">
-            Réservation confirmée
+            ${isTestMode ? "Confirmation de test" : "Réservation confirmée"}
           </h1>
           <p style="margin:12px 0 0;font-size:14px;line-height:1.5;opacity:0.9;">
-            Votre réservation a bien été créée côté Armas.
+            ${
+              isTestMode
+                ? "Paiement sandbox capturé. Aucun dossier réel n’a été créé côté transporteur."
+                : "Votre réservation a bien été créée côté Armas."
+            }
           </p>
         </div>
 
         <div style="padding:24px;">
           <div style="display:block;">
+            ${
+              isTestMode
+                ? `
+            <div style="background:#fff7ed;border:1px solid #fdba74;border-radius:16px;padding:16px;">
+              <div style="font-size:12px;text-transform:uppercase;letter-spacing:0.06em;color:#9a3412;font-weight:700;">
+                TEST
+              </div>
+              <div style="margin-top:8px;font-size:15px;line-height:1.6;color:#7c2d12;">
+                Cet email confirme uniquement le bon fonctionnement du parcours de paiement en mode test. Aucune réservation réelle n’a été émise chez le transporteur.
+              </div>
+            </div>
+            `
+                : ""
+            }
+
             <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:16px;padding:16px;">
               <div style="font-size:12px;text-transform:uppercase;letter-spacing:0.06em;color:#64748b;font-weight:700;">
-                Référence
+                ${isTestMode ? "Référence de test" : "Référence"}
               </div>
               <div style="margin-top:8px;font-size:28px;font-weight:700;color:#0f172a;">
                 ${input.codigoLocata}
@@ -200,7 +222,11 @@ function buildEmailHtml(input: BookingConfirmationEmailInput) {
             </div>
 
             <p style="margin:24px 0 0;font-size:14px;line-height:1.6;color:#475569;">
-              Conservez cet email. Il contient votre référence de réservation.
+              ${
+                isTestMode
+                  ? "Conservez cet email comme preuve de test. Il ne correspond pas à une réservation réelle."
+                  : "Conservez cet email. Il contient votre référence de réservation."
+              }
             </p>
           </div>
         </div>
@@ -210,12 +236,21 @@ function buildEmailHtml(input: BookingConfirmationEmailInput) {
 }
 
 function buildEmailText(input: BookingConfirmationEmailInput) {
+  const isTestMode = input.mode === "test";
+
   return [
     "Solair Voyages",
     "",
-    "Réservation confirmée",
+    isTestMode ? "Confirmation de test" : "Réservation confirmée",
+    ...(isTestMode
+      ? [
+          "",
+          "TEST",
+          "Paiement sandbox capturé. Aucune réservation réelle n’a été créée côté transporteur.",
+        ]
+      : []),
     "",
-    `Référence : ${input.codigoLocata}`,
+    `${isTestMode ? "Référence de test" : "Référence"} : ${input.codigoLocata}`,
     `Montant : ${formatAmount(input.total)}`,
     `Trajet : ${input.origen} → ${input.destino}`,
     `Départ : ${formatApiDate(input.fechaSalida)} • ${formatApiTime(
@@ -235,7 +270,9 @@ function buildEmailText(input: BookingConfirmationEmailInput) {
     "Voyageurs :",
     buildTravelersText(input.travelers),
     "",
-    "Conservez cet email. Il contient votre référence de réservation.",
+    isTestMode
+      ? "Conservez cet email comme preuve de test. Il ne correspond pas à une réservation réelle."
+      : "Conservez cet email. Il contient votre référence de réservation.",
   ].join("\n");
 }
 
@@ -256,7 +293,9 @@ export async function sendBookingConfirmationEmail(
 
   const resend = new Resend(apiKey);
 
-  const subject = `Réservation confirmée ${input.codigoLocata} – Solair Voyages`;
+  const subject = `${
+    input.mode === "test" ? "[TEST] " : ""
+  }Réservation confirmée ${input.codigoLocata} – Solair Voyages`;
 
   const { data, error } = await resend.emails.send({
     from,

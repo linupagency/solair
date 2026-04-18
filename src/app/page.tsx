@@ -1907,8 +1907,8 @@ export default function HomePage() {
                           </div>
                         </div>
                         <p className="max-w-xl text-right text-sm leading-relaxed text-slate-500">
-                          Dates réelles, ports compatibles et options de voyage
-                          alignés sur les réponses du réseau.
+                          Choisissez facilement vos dates, vos ports et vos
+                          options de voyage selon les disponibilités du moment.
                         </p>
                       </div>
 
@@ -2070,9 +2070,8 @@ export default function HomePage() {
 
                       <div className="mt-7 flex items-end justify-between gap-8">
                         <p className="max-w-3xl text-sm leading-relaxed text-slate-500">
-                          Le client choisit uniquement des ports compatibles,
-                          des dates réellement ouvertes à la réservation et des
-                          options disponibles pour la traversée sélectionnée.
+                          Sélectionnez votre traversée parmi les départs, dates
+                          et options actuellement disponibles.
                         </p>
                         <button
                           type="submit"
@@ -2389,8 +2388,8 @@ export default function HomePage() {
               </form>
             </div>
             <p className="mx-auto mt-3 max-w-2xl px-2 text-center text-xs leading-relaxed text-white/90">
-              Tarifs et disponibilités selon les réponses du réseau — vérifiez
-              les dates proposées dans le calendrier.
+              Consultez les disponibilités du moment et choisissez les dates
+              qui vous conviennent le mieux.
             </p>
           </div>
         </div>
@@ -2525,14 +2524,18 @@ export default function HomePage() {
           </div>
           <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
             <p className="text-sm text-slate-700">
-              Selon la nouvelle réglementation des Bonifications pour les
-              résidents non-péninsulaires et les familles nombreuses, adoptée
-              dans la Loi de Finances Générale pour 2021, la réduction pour
-              résidents sera indiquée et appliquée lors de la dernière étape du
-              processus d&apos;achat, en même temps que les données de chaque
-              passager.
+              Les réductions éventuellement applicables seront précisées à
+              l&apos;étape suivante, avec le détail de chaque voyageur.
             </p>
           </div>
+
+          <button
+            type="button"
+            onClick={() => setSheet(null)}
+            className="inline-flex min-h-[52px] w-full items-center justify-center rounded-2xl bg-[#163B6D] px-5 py-3 text-base font-bold text-white shadow-sm transition hover:bg-[#0f2d55] focus-visible:outline focus-visible:ring-2 focus-visible:ring-[#163B6D]/40 focus-visible:ring-offset-2"
+          >
+            Valider
+          </button>
         </div>
       </ResponsivePicker>
 
@@ -2866,7 +2869,9 @@ export default function HomePage() {
       >
         <div className="space-y-3">
           {loadingDiscounts ? (
-            <p className="text-sm text-slate-600">Chargement des bonifications Armas…</p>
+            <p className="text-sm text-slate-600">
+              Chargement des réductions disponibles…
+            </p>
           ) : (
             availableDiscounts.map((option) => (
               <PickerOption

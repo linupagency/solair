@@ -335,13 +335,19 @@ function SectionCard({
   title,
   subtitle,
   children,
+  variant = "panel",
 }: {
   title: string;
   subtitle?: string;
   children: ReactNode;
+  variant?: "panel" | "plain";
 }) {
   return (
-    <section className="solair-panel p-5 sm:p-6">
+    <section
+      className={
+        variant === "panel" ? "solair-panel p-5 sm:p-6" : "px-1 py-1"
+      }
+    >
       <div className="mb-5">
         <h2 className="text-xl font-bold text-slate-900">{title}</h2>
         {subtitle ? <p className="mt-1 text-sm text-slate-500">{subtitle}</p> : null}
@@ -350,6 +356,9 @@ function SectionCard({
     </section>
   );
 }
+
+const REAL_BOOKING_ENABLED =
+  process.env.NEXT_PUBLIC_ENABLE_REAL_BOOKING === "true";
 
 export default function RecapitulatifPage() {
   const router = useRouter();
@@ -404,26 +413,37 @@ export default function RecapitulatifPage() {
           selectedRtPricing.inboundEuros != null &&
           Number.isFinite(selectedRtPricing.outboundEuros) &&
           Number.isFinite(selectedRtPricing.inboundEuros);
+        const commonPricingMeta = {
+          codigoTarifa: String(selectedRtPricing.codigoTarifa || "").trim(),
+          tarifaLabel: String(selectedRtPricing.tarifaLabel || "").trim() || "-",
+          bonificationLabel: String(
+            selectedRtPricing.bonificationLabel || ""
+          ).trim(),
+        };
         if (hasLegSplit) {
           setOutboundPricing({
             status: "success",
             totalValue: selectedRtPricing.outboundEuros!,
             totalDisplay: formatMoney(selectedRtPricing.outboundEuros!),
+            ...commonPricingMeta,
           });
           setInboundPricing({
             status: "success",
             totalValue: selectedRtPricing.inboundEuros!,
             totalDisplay: formatMoney(selectedRtPricing.inboundEuros!),
+            ...commonPricingMeta,
           });
         } else {
           setOutboundPricing({
             status: "success",
             totalValue: selectedRtPricing.totalEuros,
             totalDisplay: formatMoney(selectedRtPricing.totalEuros),
+            ...commonPricingMeta,
             roundTripBundleCombined: true,
           });
           setInboundPricing({
             status: "success",
+            ...commonPricingMeta,
             roundTripBundleCombined: true,
           });
         }
@@ -1230,22 +1250,22 @@ export default function RecapitulatifPage() {
 
   return (
     <main className="min-h-screen bg-[#F7F5F2] text-slate-900">
-      <section className="solair-hero pb-8 pt-5">
+      <section className="relative overflow-hidden bg-[radial-gradient(circle_at_10%_16%,rgb(44_166_164/0.24),transparent_17rem),radial-gradient(circle_at_88%_8%,rgb(242_140_40/0.3),transparent_18rem),radial-gradient(circle_at_78%_0%,rgb(217_74_58/0.2),transparent_14rem),linear-gradient(135deg,#102D54_0%,#163B6D_56%,#235392_100%)] pb-8 pt-5">
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
-          <div className="solair-stepbar mb-5">
-            <span className="solair-stepchip solair-stepchip--done">
+          <div className="mb-5 flex gap-2.5 overflow-x-auto pb-[0.35rem] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+            <span className="flex-none rounded-full bg-white px-[0.95rem] py-[0.58rem] text-xs font-bold leading-none tracking-[0.01em] text-[#163B6D] shadow-[0_6px_20px_rgba(12,36,67,0.12)]">
               1. Recherche
             </span>
-            <span className="solair-stepchip solair-stepchip--done">
+            <span className="flex-none rounded-full bg-white px-[0.95rem] py-[0.58rem] text-xs font-bold leading-none tracking-[0.01em] text-[#163B6D] shadow-[0_6px_20px_rgba(12,36,67,0.12)]">
               2. Traversées et prix
             </span>
-            <span className="solair-stepchip solair-stepchip--done">
+            <span className="flex-none rounded-full bg-white px-[0.95rem] py-[0.58rem] text-xs font-bold leading-none tracking-[0.01em] text-[#163B6D] shadow-[0_6px_20px_rgba(12,36,67,0.12)]">
               3. Hébergement
             </span>
-            <span className="solair-stepchip solair-stepchip--done">
+            <span className="flex-none rounded-full bg-white px-[0.95rem] py-[0.58rem] text-xs font-bold leading-none tracking-[0.01em] text-[#163B6D] shadow-[0_6px_20px_rgba(12,36,67,0.12)]">
               4. Passager
             </span>
-            <span className="solair-stepchip solair-stepchip--active">
+            <span className="flex-none rounded-full bg-[linear-gradient(135deg,#F28C28,#F7A744)] px-[0.95rem] py-[0.58rem] text-xs font-bold leading-none tracking-[0.01em] text-white shadow-[0_12px_28px_rgba(242,140,40,0.34)]">
               5. Récapitulatif
             </span>
           </div>
@@ -1266,7 +1286,7 @@ export default function RecapitulatifPage() {
             <button
               type="button"
               onClick={() => router.back()}
-              className="solair-secondary-btn px-4 py-3 text-sm font-semibold"
+              className="inline-flex justify-center rounded-2xl border border-white/25 bg-white/12 px-4 py-3 text-sm font-semibold text-white transition hover:-translate-y-px hover:bg-white/18"
             >
               Retour
             </button>
@@ -1281,6 +1301,7 @@ export default function RecapitulatifPage() {
               <SectionCard
                 title="Traversée"
                 subtitle="Résumé des segments sélectionnés."
+                variant="plain"
               >
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="rounded-2xl bg-[#F3F6F7] p-4">
@@ -1328,6 +1349,7 @@ export default function RecapitulatifPage() {
               <SectionCard
                 title="Voyageurs"
                 subtitle="Identités utilisées pour la réservation."
+                variant="plain"
               >
                 <div className="space-y-4">
                   {bookingFlow.travelers.map((traveler, index) => {
@@ -1387,6 +1409,7 @@ export default function RecapitulatifPage() {
                 <SectionCard
                   title="Véhicules"
                   subtitle="Informations associées au dossier."
+                  variant="plain"
                 >
                   <div className="space-y-4">
                     {bookingFlow.search.vehicles.map((vehicle, index) => (
@@ -1440,6 +1463,7 @@ export default function RecapitulatifPage() {
               <SectionCard
                 title="Contact principal"
                 subtitle="Coordonnées utilisées pour le suivi."
+                variant="plain"
               >
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="rounded-2xl bg-[#F3F6F7] p-4">
@@ -1657,6 +1681,19 @@ export default function RecapitulatifPage() {
                       </p>
                       <p className="mt-2 text-sm text-slate-600">
                         Les informations voyageurs sont incomplètes.
+                      </p>
+                    </div>
+                  )}
+
+                  {!REAL_BOOKING_ENABLED && (
+                    <div className="rounded-2xl bg-[#FBE9E7] p-4 ring-1 ring-[#E9B8B2]">
+                      <p className="text-sm font-semibold text-[#1F2F46]">
+                        Mode test actif
+                      </p>
+                      <p className="mt-2 text-sm text-slate-600">
+                        Le paiement PayPal peut être testé normalement. En
+                        revanche, la création réelle de la réservation reste
+                        bloquée tant que le mode production n’est pas activé.
                       </p>
                     </div>
                   )}

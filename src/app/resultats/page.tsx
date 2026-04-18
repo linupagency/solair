@@ -109,6 +109,10 @@ type DeparturesApiResponse = {
 };
 
 type PricingLine = {
+  bonificacionEntidad?: {
+    codigoBonificacion?: string;
+    textoCorto?: string;
+  };
   precioEntidad?: {
     total?: number | string;
   };
@@ -143,6 +147,9 @@ type SelectedRoundTripTotalsState = {
   inbound: number | null;
   bundleTotal: number;
   segmentVentilationReliable: boolean;
+  codigoTarifa: string;
+  tarifaLabel: string;
+  bonificationLabel: string;
   outboundMatchKey: string;
   inboundMatchKey: string;
   outboundMatchParts: PricingMatchParts;
@@ -1579,14 +1586,14 @@ function ResultatsPageContent() {
                     {
                       status: "error",
                       note:
-                        "Réponse Armas : montant du segment courant introuvable pour cette offre.",
+                        "Tarif momentanément indisponible pour cette traversée.",
                     } satisfies PricingState,
                   ] as const;
                 }
                 totalForCard = `${legEuros.toFixed(2).replace(".", ",")} €`;
               } else {
                 pricingNote =
-                  "Forfait aller-retour Armas calculé sur la base du dossier courant.";
+                  "Prix aller-retour calculé pour l’ensemble de votre voyage.";
               }
             }
 
@@ -1601,7 +1608,7 @@ function ResultatsPageContent() {
                 {
                   status: "error",
                   note:
-                    "Réponse Armas AR incomplète: blocs ida/vta absents pour cette offre.",
+                    "Le détail aller et retour n’est pas encore disponible pour cette offre.",
                 } satisfies PricingState,
               ] as const;
             }
@@ -1822,6 +1829,19 @@ function ResultatsPageContent() {
       return null;
     }
 
+    const lines = normalizeArray(
+      getTarificacionRawLinesFromSoapResult(priced.soapData) as PricingLine[]
+    );
+    const first = lines[0];
+    const codigoTarifa = String(first?.tarifaEntidad?.codigoTarifa || "").trim();
+    const tarifaLabel = String(first?.tarifaEntidad?.textoCorto || "").trim();
+    const bonificationLabel = String(
+      first?.bonificacionEntidad?.textoCorto || ""
+    ).trim();
+    if (!codigoTarifa) {
+      return null;
+    }
+
     const segmentVentilationReliable = priced.segmentVentilationReliable === true;
     if (segmentVentilationReliable) {
       const o = priced.outboundEuros;
@@ -1888,6 +1908,9 @@ function ResultatsPageContent() {
       inbound: segmentVentilationReliable ? priced.returnEuros! : null,
       bundleTotal: bundleRaw,
       segmentVentilationReliable,
+      codigoTarifa,
+      tarifaLabel,
+      bonificationLabel,
       outboundMatchKey,
       inboundMatchKey,
       outboundMatchParts,
@@ -1971,12 +1994,23 @@ function ResultatsPageContent() {
           idaTotal != null &&
           vtaTotal != null &&
           Math.abs(idaTotal + vtaTotal - bundleTotal) <= 0.03;
+        const codigoTarifa = String(
+          rawLine?.tarifaEntidad?.codigoTarifa || ""
+        ).trim();
+        if (!codigoTarifa) {
+          return null;
+        }
 
         return {
           outbound: segmentVentilationReliable ? idaTotal : null,
           inbound: segmentVentilationReliable ? vtaTotal : null,
           bundleTotal,
           segmentVentilationReliable,
+          codigoTarifa,
+          tarifaLabel: String(rawLine?.tarifaEntidad?.textoCorto || "").trim(),
+          bonificationLabel: String(
+            rawLine?.bonificacionEntidad?.textoCorto || ""
+          ).trim(),
           outboundMatchKey: pricingPartsToKey(outboundMatchParts),
           inboundMatchKey: pricingPartsToKey(inboundMatchParts),
           outboundMatchParts,
@@ -2006,11 +2040,28 @@ function ResultatsPageContent() {
       return null;
     }
 
+    const fallbackCodigoTarifa = String(
+      (outboundState?.raw as PricingLine | undefined)?.tarifaEntidad
+        ?.codigoTarifa || ""
+    ).trim();
+    if (!fallbackCodigoTarifa) {
+      return null;
+    }
+
     return {
       outbound: outboundEuros,
       inbound: inboundEuros,
       bundleTotal: roundEuros(outboundEuros + inboundEuros),
       segmentVentilationReliable: true,
+      codigoTarifa: fallbackCodigoTarifa,
+      tarifaLabel: String(
+        (outboundState?.raw as PricingLine | undefined)?.tarifaEntidad
+          ?.textoCorto || ""
+      ).trim(),
+      bonificationLabel: String(
+        (outboundState?.raw as PricingLine | undefined)?.bonificacionEntidad
+          ?.textoCorto || ""
+      ).trim(),
       outboundMatchKey: pricingPartsToKey(outboundMatchParts),
       inboundMatchKey: pricingPartsToKey(inboundMatchParts),
       outboundMatchParts,
@@ -2136,21 +2187,21 @@ function ResultatsPageContent() {
   const roundTripSelectionHint = useMemo(() => {
     if (!flow || flow.tripType !== "round_trip") return "";
     if (!selectedOutbound) {
-      return "Commencez par choisir votre traversée aller (colonne de gauche sur ordinateur, ou première section sur mobile).";
+      return "Commencez par choisir votre traversée aller pour découvrir les options disponibles.";
     }
     if (!outboundTariffOk) {
-      return "Le tarif aller est encore en cours de calcul ou n’est pas disponible pour l’option choisie.";
+      return "Le tarif de cette traversée est en cours de mise à jour. Merci de patienter un instant.";
     }
     if (!selectedInbound) {
-      return "Choisissez maintenant votre retour pour continuer.";
+      return "Parfait. Choisissez maintenant votre traversée retour pour finaliser votre sélection.";
     }
     if (!inboundTariffOk) {
-      return "Le tarif retour est encore en cours de calcul ou n’est pas disponible pour l’option choisie.";
+      return "Le tarif du retour est en cours de mise à jour. Merci de patienter un instant.";
     }
     if (canContinue) {
-      return "Aller et retour sont sélectionnés et tarifés — vous pouvez continuer vers l’hébergement.";
+      return "Vos traversées aller et retour sont prêtes. Vous pouvez continuer vers l’hébergement.";
     }
-    return "Vérifiez vos sélections avant de continuer.";
+    return "Vérifiez votre sélection pour continuer sereinement.";
   }, [
     flow,
     selectedOutbound,
@@ -2403,6 +2454,10 @@ function ResultatsPageContent() {
                   String(selectedOutbound.service.codigoServicioVenta || "").trim(),
                 serviceType:
                   String(selectedOutbound.service.tipoServicioVenta || "").trim(),
+                codigoTarifa: effectiveSelectedRoundTripTotals.codigoTarifa,
+                tarifaLabel: effectiveSelectedRoundTripTotals.tarifaLabel,
+                bonificationLabel:
+                  effectiveSelectedRoundTripTotals.bonificationLabel,
                 rawPricingResponse: effectiveSelectedRoundTripTotals.rawPricingResponse,
               }
             : undefined,
@@ -2949,7 +3004,7 @@ function ResultatsPageContent() {
                                       seatSelected ? "text-white/75" : "text-slate-500"
                                     }`}
                                   >
-                                    Total aller-retour calculé pour votre dossier Armas.
+                                    Total aller-retour calculé pour votre voyage.
                                   </p>
                                 ) : bestSeat.source ===
                                   "neutral_round_trip_quote" ? (
@@ -3041,7 +3096,7 @@ function ResultatsPageContent() {
                                       cabinSelected ? "text-white/75" : "text-slate-500"
                                     }`}
                                   >
-                                    Total aller-retour calculé pour votre dossier Armas.
+                                    Total aller-retour calculé pour votre voyage.
                                   </p>
                                 ) : bestCabin.source ===
                                   "neutral_round_trip_quote" ? (
@@ -3166,22 +3221,22 @@ function ResultatsPageContent() {
 
   return (
     <main className="min-h-screen bg-[#F7F5F2] text-slate-900">
-      <section className="solair-hero pb-8 pt-5">
+      <section className="relative overflow-hidden bg-[radial-gradient(circle_at_10%_16%,rgb(44_166_164/0.24),transparent_17rem),radial-gradient(circle_at_88%_8%,rgb(242_140_40/0.3),transparent_18rem),radial-gradient(circle_at_78%_0%,rgb(217_74_58/0.2),transparent_14rem),linear-gradient(135deg,#102D54_0%,#163B6D_56%,#235392_100%)] pb-8 pt-5">
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
-          <div className="solair-stepbar mb-5">
-            <span className="solair-stepchip solair-stepchip--done">
+          <div className="mb-5 flex gap-2.5 overflow-x-auto pb-[0.35rem] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+            <span className="flex-none rounded-full bg-white px-[0.95rem] py-[0.58rem] text-xs font-bold leading-none tracking-[0.01em] text-[#163B6D] shadow-[0_6px_20px_rgba(12,36,67,0.12)]">
               1. Recherche
             </span>
-            <span className="solair-stepchip solair-stepchip--active">
+            <span className="flex-none rounded-full bg-[linear-gradient(135deg,#F28C28,#F7A744)] px-[0.95rem] py-[0.58rem] text-xs font-bold leading-none tracking-[0.01em] text-white shadow-[0_12px_28px_rgba(242,140,40,0.34)]">
               2. Traversées et prix
             </span>
-            <span className="solair-stepchip solair-stepchip--pending">
+            <span className="flex-none rounded-full border border-white/15 bg-white/12 px-[0.95rem] py-[0.58rem] text-xs font-bold leading-none tracking-[0.01em] text-white/95">
               3. Hébergement
             </span>
-            <span className="solair-stepchip solair-stepchip--pending">
+            <span className="flex-none rounded-full border border-white/15 bg-white/12 px-[0.95rem] py-[0.58rem] text-xs font-bold leading-none tracking-[0.01em] text-white/95">
               4. Passager
             </span>
-            <span className="solair-stepchip solair-stepchip--pending">
+            <span className="flex-none rounded-full border border-white/15 bg-white/12 px-[0.95rem] py-[0.58rem] text-xs font-bold leading-none tracking-[0.01em] text-white/95">
               5. Récapitulatif
             </span>
           </div>
@@ -3200,7 +3255,7 @@ function ResultatsPageContent() {
             <button
               type="button"
               onClick={() => router.push("/")}
-              className="solair-secondary-btn inline-flex justify-center px-4 py-3 text-sm font-semibold"
+              className="inline-flex justify-center rounded-2xl border border-white/25 bg-white/12 px-4 py-3 text-sm font-semibold text-white transition hover:-translate-y-px hover:bg-white/18"
             >
               Nouvelle recherche
             </button>
@@ -3218,8 +3273,8 @@ function ResultatsPageContent() {
             <>
               <div className="mb-6">
                 <SectionCard
-                  title="Configuration de recherche"
-                  subtitle="Données du dossier de réservation."
+                  title="Votre recherche"
+                  subtitle="Retrouvez ici les détails de votre voyage."
                 >
                   <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                     <div className="rounded-2xl bg-[#F3F6F7] p-4">
@@ -3277,7 +3332,7 @@ function ResultatsPageContent() {
                 <>
                   <div className="sticky top-2 z-30 mb-5 hidden rounded-[24px] border border-slate-200 bg-white/95 p-5 shadow-[0_8px_30px_rgba(15,23,42,0.12)] backdrop-blur-md lg:block">
                     <p className="text-xs font-bold uppercase tracking-wide text-[#163B6D]">
-                      Aller-retour — état de la sélection
+                      Votre sélection aller-retour
                     </p>
                     <div className="mt-4 grid gap-3 sm:grid-cols-2">
                       <div
@@ -3297,7 +3352,7 @@ function ResultatsPageContent() {
                             ? "Non"
                             : outboundTariffOk
                               ? "Oui, tarif confirmé"
-                              : "Choisi — tarif en attente ou indisponible"}
+                              : "Sélectionné — confirmation du tarif en cours"}
                         </p>
                         {selectedOutbound ? (
                           <p className="mt-2 text-xs text-slate-600">
@@ -3307,7 +3362,7 @@ function ResultatsPageContent() {
                           </p>
                         ) : (
                           <p className="mt-2 text-xs text-slate-500">
-                            Choisissez une offre dans la colonne « Aller ».
+                            Sélectionnez l’aller qui vous convient.
                           </p>
                         )}
                       </div>
@@ -3328,7 +3383,7 @@ function ResultatsPageContent() {
                             ? "Non"
                             : inboundTariffOk
                               ? "Oui, tarif confirmé"
-                              : "Choisi — tarif en attente ou indisponible"}
+                              : "Sélectionné — confirmation du tarif en cours"}
                         </p>
                         {selectedInbound ? (
                           <p className="mt-2 text-xs text-slate-600">
@@ -3338,7 +3393,7 @@ function ResultatsPageContent() {
                           </p>
                         ) : (
                           <p className="mt-2 text-xs text-slate-500">
-                            Choisissez une offre dans la colonne « Retour ».
+                            Sélectionnez ensuite le retour qui vous convient.
                           </p>
                         )}
                       </div>
@@ -3371,7 +3426,7 @@ function ResultatsPageContent() {
                             </>
                           ) : (
                             <div className="flex justify-between gap-3 font-bold text-slate-900">
-                              <span>Total aller-retour (forfait Armas)</span>
+                              <span>Total aller-retour</span>
                               <span>{formatMoney(roundTripTransportAmounts.total)}</span>
                             </div>
                           )}
@@ -3388,8 +3443,8 @@ function ResultatsPageContent() {
                     ) : null}
                     {!canContinue ? (
                       <p className="mt-2 text-xs text-amber-900">
-                        Le bouton reste désactivé tant que l’aller et le retour ne
-                        sont pas tous deux choisis avec un tarif valide.
+                        Le bouton s’active dès que vos traversées aller et retour
+                        sont confirmées.
                       </p>
                     ) : null}
                     <button
@@ -3507,7 +3562,7 @@ function ResultatsPageContent() {
                     </p>
                     {!canContinue ? (
                       <p className="mb-2 text-center text-[10px] text-amber-900">
-                        Bouton actif lorsque aller et retour sont tarifés.
+                        Le bouton s’active dès que vos traversées sont prêtes.
                       </p>
                     ) : null}
                     <button
@@ -3526,8 +3581,8 @@ function ResultatsPageContent() {
             <>
               <div className="mb-6 grid gap-4 lg:grid-cols-[1fr_1fr]">
                 <SectionCard
-                  title="Configuration de recherche"
-                  subtitle="Données du dossier de réservation."
+                  title="Votre recherche"
+                  subtitle="Retrouvez ici les détails de votre voyage."
                 >
                   <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                     <div className="rounded-2xl bg-[#F3F6F7] p-4">
