@@ -3001,11 +3001,11 @@ function ResultatsPageContent() {
                   key={`${direction}-${salida.fechaSalida}-${salida.horaSalida}-${index}`}
                   className="rounded-[28px] border border-slate-200 bg-white px-6 py-5 shadow-[0_8px_18px_rgba(15,23,42,0.04)]"
                 >
-                  <div className="-mx-2 overflow-x-auto px-2 pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-                    <div className="min-w-[52rem]">
+                  <div className="pb-1 md:-mx-2 md:overflow-x-auto md:px-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+                    <div className="min-w-0 md:min-w-[52rem]">
                       <div className="grid gap-5">
-                        <div className="flex items-center gap-8">
-                          <div className="min-w-[7rem]">
+                        <div className="grid gap-4 sm:grid-cols-2 md:flex md:items-center md:gap-8">
+                          <div className="min-w-0 md:min-w-[7rem]">
                             <p className="text-[2.6rem] font-bold leading-none text-slate-900">
                               {formatApiTime(salida.horaSalida)}
                             </p>
@@ -3014,18 +3014,18 @@ function ResultatsPageContent() {
                             </p>
                           </div>
 
-                          <div className="min-w-[10rem] text-center text-slate-400">
-                            <div className="flex items-center gap-3">
+                          <div className="min-w-0 text-slate-400 sm:text-right md:min-w-[10rem] md:text-center">
+                            <div className="hidden items-center gap-3 md:flex">
                               <span className="h-px flex-1 bg-slate-300" />
                               <span className="text-base">◷</span>
                               <span className="h-px flex-1 bg-slate-300" />
                             </div>
-                            <p className="mt-2 text-[1.05rem] font-medium text-slate-500">
+                            <p className="text-[1.05rem] font-medium text-slate-500 md:mt-2">
                               Durée {durationSummary}
                             </p>
                           </div>
 
-                          <div className="min-w-[7rem]">
+                          <div className="min-w-0 md:min-w-[7rem]">
                             <p className="text-[2.6rem] font-bold leading-none text-slate-900">
                               {formatApiTime(salida.horaLlegada)}
                             </p>
@@ -3034,7 +3034,7 @@ function ResultatsPageContent() {
                             </p>
                           </div>
 
-                          <div className="min-w-0 flex-1">
+                          <div className="min-w-0 sm:col-span-2 md:flex-1">
                             <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-base text-slate-600">
                               {boatType ? <span>{boatType}</span> : null}
                               {boatName ? (
@@ -3373,11 +3373,11 @@ function ResultatsPageContent() {
                                     : "border-[#163B6D] bg-[#163B6D] hover:bg-[#1B447A]"
                                 }`}
                               >
-                                <div className="grid grid-cols-[12rem_minmax(0,1fr)_18rem] items-center gap-6">
+                                <div className="grid gap-4 md:grid-cols-[12rem_minmax(0,1fr)_18rem] md:items-center md:gap-6">
                                   <div className="min-w-0">
                                     <p className="text-[1.35rem] font-bold leading-none text-white">
-                                        Fauteuil
-                                      </p>
+                                      Fauteuil
+                                    </p>
                                   </div>
 
                                   <div className="text-sm leading-relaxed text-white/85">
@@ -3395,7 +3395,7 @@ function ResultatsPageContent() {
                                     </p>
                                   </div>
 
-                                  <div className="flex justify-end">
+                                  <div className="flex justify-start md:justify-end">
                                     <span className="inline-flex min-h-[3.65rem] shrink-0 items-center justify-center rounded-[14px] bg-[#FFC928] px-5 text-sm font-extrabold uppercase tracking-[0.06em] text-[#163B6D] shadow-[0_10px_24px_rgba(255,201,40,0.26)]">
                                       {seatSelected ? "Sélectionné" : "Sélectionner"}
                                     </span>
@@ -3419,11 +3419,11 @@ function ResultatsPageContent() {
                                     : "border-[#163B6D] bg-[#163B6D] hover:bg-[#1B447A]"
                                 }`}
                               >
-                                <div className="grid grid-cols-[12rem_minmax(0,1fr)_18rem] items-center gap-6">
+                                <div className="grid gap-4 md:grid-cols-[12rem_minmax(0,1fr)_18rem] md:items-center md:gap-6">
                                   <div className="min-w-0">
                                     <p className="text-[1.35rem] font-bold leading-none text-white">
-                                        Cabine
-                                      </p>
+                                      Cabine
+                                    </p>
                                   </div>
 
                                   <div className="text-sm leading-relaxed text-white/85">
@@ -3441,7 +3441,7 @@ function ResultatsPageContent() {
                                     </p>
                                   </div>
 
-                                  <div className="flex justify-end">
+                                  <div className="flex justify-start md:justify-end">
                                     <span className="inline-flex min-h-[3.65rem] shrink-0 items-center justify-center rounded-[14px] bg-[#FFC928] px-5 text-sm font-extrabold uppercase tracking-[0.06em] text-[#163B6D] shadow-[0_10px_24px_rgba(255,201,40,0.26)]">
                                       {cabinSelected ? "Sélectionné" : "Sélectionner"}
                                     </span>
