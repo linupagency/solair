@@ -3004,7 +3004,7 @@ function ResultatsPageContent() {
                   <div className="pb-1 md:-mx-2 md:overflow-x-auto md:px-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
                     <div className="min-w-0 md:min-w-[52rem]">
                       <div className="grid gap-4 md:gap-5">
-                        <div className="grid gap-3 sm:grid-cols-2 md:flex md:items-center md:gap-8">
+                        <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-start gap-x-4 gap-y-3 md:flex md:items-center md:gap-8">
                           <div className="min-w-0 md:min-w-[7rem]">
                             <p className="text-[2.15rem] font-bold leading-none text-slate-900 md:text-[2.6rem]">
                               {formatApiTime(salida.horaSalida)}
@@ -3014,7 +3014,7 @@ function ResultatsPageContent() {
                             </p>
                           </div>
 
-                          <div className="min-w-0 text-slate-400 sm:text-right md:min-w-[10rem] md:text-center">
+                          <div className="min-w-0 pt-1 text-center text-slate-400 md:min-w-[10rem] md:pt-0 md:text-center">
                             <div className="hidden items-center gap-3 md:flex">
                               <span className="h-px flex-1 bg-slate-300" />
                               <span className="text-base">◷</span>
@@ -3025,7 +3025,7 @@ function ResultatsPageContent() {
                             </p>
                           </div>
 
-                          <div className="min-w-0 md:min-w-[7rem]">
+                          <div className="min-w-0 text-right md:min-w-[7rem] md:text-left">
                             <p className="text-[2.15rem] font-bold leading-none text-slate-900 md:text-[2.6rem]">
                               {formatApiTime(salida.horaLlegada)}
                             </p>
@@ -3034,7 +3034,7 @@ function ResultatsPageContent() {
                             </p>
                           </div>
 
-                          <div className="min-w-0 sm:col-span-2 md:flex-1">
+                          <div className="col-span-3 min-w-0 md:flex-1">
                             <div className="flex flex-wrap items-center gap-x-2 gap-y-2 text-sm text-slate-600 md:gap-x-3 md:text-base">
                               {boatType ? <span>{boatType}</span> : null}
                               {boatName ? (
@@ -3373,14 +3373,20 @@ function ResultatsPageContent() {
                                     : "border-[#163B6D] bg-[#163B6D] hover:bg-[#1B447A]"
                                 }`}
                               >
-                                <div className="grid gap-3 md:grid-cols-[12rem_minmax(0,1fr)_18rem] md:items-center md:gap-6">
+                                <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-4 md:grid-cols-[12rem_minmax(0,1fr)_18rem] md:items-center md:gap-6">
                                   <div className="min-w-0">
                                     <p className="text-[1.05rem] font-bold leading-none text-white md:text-[1.35rem]">
                                       Fauteuil
                                     </p>
                                   </div>
 
-                                  <div className="text-[0.9rem] leading-relaxed text-white/85 md:text-sm">
+                                  <div className="flex justify-end md:justify-start md:col-auto">
+                                    <span className="inline-flex min-h-[2.9rem] shrink-0 items-center justify-center rounded-[12px] bg-[#FFC928] px-4 text-[0.72rem] font-extrabold uppercase tracking-[0.05em] text-[#163B6D] shadow-[0_10px_24px_rgba(255,201,40,0.26)] md:min-h-[3.65rem] md:rounded-[14px] md:px-5 md:text-sm">
+                                      {seatSelected ? "Sélectionné" : "Sélectionner"}
+                                    </span>
+                                  </div>
+
+                                  <div className="col-span-2 text-[0.9rem] leading-relaxed text-white/85 md:col-span-1 md:text-sm">
                                     <p>
                                       {bestSeat.source ===
                                       "selected_roundtrip_reuse_exact_match"
@@ -3393,12 +3399,6 @@ function ResultatsPageContent() {
                                             ? ROUND_TRIP_CARD_NEUTRAL_PRICE_LABEL
                                             : `Tarif disponible pour cette traversée • ${duration}`}
                                     </p>
-                                  </div>
-
-                                  <div className="flex justify-start md:justify-end">
-                                    <span className="inline-flex min-h-[2.9rem] shrink-0 items-center justify-center rounded-[12px] bg-[#FFC928] px-4 text-[0.72rem] font-extrabold uppercase tracking-[0.05em] text-[#163B6D] shadow-[0_10px_24px_rgba(255,201,40,0.26)] md:min-h-[3.65rem] md:rounded-[14px] md:px-5 md:text-sm">
-                                      {seatSelected ? "Sélectionné" : "Sélectionner"}
-                                    </span>
                                   </div>
                                 </div>
                               </button>
@@ -3419,14 +3419,20 @@ function ResultatsPageContent() {
                                     : "border-[#163B6D] bg-[#163B6D] hover:bg-[#1B447A]"
                                 }`}
                               >
-                                <div className="grid gap-3 md:grid-cols-[12rem_minmax(0,1fr)_18rem] md:items-center md:gap-6">
+                                <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-4 md:grid-cols-[12rem_minmax(0,1fr)_18rem] md:items-center md:gap-6">
                                   <div className="min-w-0">
                                     <p className="text-[1.05rem] font-bold leading-none text-white md:text-[1.35rem]">
                                       Cabine
                                     </p>
                                   </div>
 
-                                  <div className="text-[0.9rem] leading-relaxed text-white/85 md:text-sm">
+                                  <div className="flex justify-end md:justify-start md:col-auto">
+                                    <span className="inline-flex min-h-[2.9rem] shrink-0 items-center justify-center rounded-[12px] bg-[#FFC928] px-4 text-[0.72rem] font-extrabold uppercase tracking-[0.05em] text-[#163B6D] shadow-[0_10px_24px_rgba(255,201,40,0.26)] md:min-h-[3.65rem] md:rounded-[14px] md:px-5 md:text-sm">
+                                      {cabinSelected ? "Sélectionné" : "Sélectionner"}
+                                    </span>
+                                  </div>
+
+                                  <div className="col-span-2 text-[0.9rem] leading-relaxed text-white/85 md:col-span-1 md:text-sm">
                                     <p>
                                       {bestCabin.source ===
                                       "selected_roundtrip_reuse_exact_match"
@@ -3439,12 +3445,6 @@ function ResultatsPageContent() {
                                             ? ROUND_TRIP_CARD_NEUTRAL_PRICE_LABEL
                                             : `Tarif disponible pour cette traversée • ${duration}`}
                                     </p>
-                                  </div>
-
-                                  <div className="flex justify-start md:justify-end">
-                                    <span className="inline-flex min-h-[2.9rem] shrink-0 items-center justify-center rounded-[12px] bg-[#FFC928] px-4 text-[0.72rem] font-extrabold uppercase tracking-[0.05em] text-[#163B6D] shadow-[0_10px_24px_rgba(255,201,40,0.26)] md:min-h-[3.65rem] md:rounded-[14px] md:px-5 md:text-sm">
-                                      {cabinSelected ? "Sélectionné" : "Sélectionner"}
-                                    </span>
                                   </div>
                                 </div>
                               </button>
