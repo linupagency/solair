@@ -2555,67 +2555,76 @@ function ResultatsPageContent() {
                 return st == null || st.status === "loading";
               });
 
+              const durationSummary = formatDurationFromTimes(
+                salida.horaSalida,
+                salida.horaLlegada
+              );
+              const boatName = String(salida.barcoEntidad?.textoCorto || "").trim();
+              const boatType = String(salida.barcoEntidad?.tipoBarco || "").trim();
+              const originLabel = String(
+                salida.trayectoEntidad?.puertoOrigenEntidad?.textoCorto ||
+                  getSalidaOrigenCode(salida) ||
+                  ""
+              ).trim();
+              const destinationLabel = String(
+                salida.trayectoEntidad?.puertoDestinoEntidad?.textoCorto ||
+                  getSalidaDestinoCode(salida) ||
+                  ""
+              ).trim();
+              const departureStatus = String(salida.estadoSalida || "").trim();
+              const showStatusAlert =
+                departureStatus.length > 0 &&
+                departureStatus.toUpperCase() !== "A";
+
               return (
                 <article
                   key={`${direction}-${salida.fechaSalida}-${salida.horaSalida}-${index}`}
-                  className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-[0_8px_18px_rgba(15,23,42,0.04)]"
+                  className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_8px_18px_rgba(15,23,42,0.04)]"
                 >
-                  <div className="grid gap-4 md:grid-cols-4">
-                    <div className="rounded-2xl bg-[#F3F6F7] p-4">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                        Départ
-                      </p>
-                      <p className="mt-2 text-xl font-bold text-slate-900">
+                  <div className="flex flex-col gap-3 border-b border-slate-100 pb-4 xl:grid xl:grid-cols-[7rem_10rem_7rem_minmax(0,1fr)] xl:items-center xl:gap-6">
+                    <div>
+                      <p className="text-[2.2rem] font-bold leading-none text-slate-900">
                         {formatApiTime(salida.horaSalida)}
                       </p>
-                      <p className="text-sm text-slate-600">
-                        {formatApiDate(salida.fechaSalida)}
+                      <p className="mt-1 text-lg text-slate-700">
+                        {originLabel || getSalidaOrigenCode(salida)}
                       </p>
                     </div>
 
-                    <div className="rounded-2xl bg-[#F3F6F7] p-4">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                        Arrivée
+                    <div className="flex flex-col items-start text-slate-400 xl:items-center">
+                      <div className="hidden w-full items-center gap-3 xl:flex">
+                        <span className="h-px flex-1 bg-slate-300" />
+                        <span className="text-xl">◷</span>
+                        <span className="h-px flex-1 bg-slate-300" />
+                      </div>
+                      <p className="mt-1 text-lg text-slate-500 xl:mt-2">
+                        Durée {durationSummary}
                       </p>
-                      <p className="mt-2 text-xl font-bold text-slate-900">
+                    </div>
+
+                    <div>
+                      <p className="text-[2.2rem] font-bold leading-none text-slate-900">
                         {formatApiTime(salida.horaLlegada)}
                       </p>
-                      <p className="text-sm text-slate-600">
-                        {formatApiDate(salida.fechaLlegada)}
+                      <p className="mt-1 text-lg text-slate-700">
+                        {destinationLabel || getSalidaDestinoCode(salida)}
                       </p>
                     </div>
 
-                    <div className="rounded-2xl bg-[#F3F6F7] p-4">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                        Bateau
-                      </p>
-                      <p className="mt-2 text-lg font-bold text-slate-900">
-                        {salida.barcoEntidad?.textoCorto || "-"}
-                      </p>
-                      <p className="text-sm text-slate-600">
-                        {salida.barcoEntidad?.tipoBarco || ""}
-                      </p>
-                    </div>
-
-                    <div className="rounded-2xl bg-[#FBE9E7] p-4 ring-1 ring-[#E9B8B2]">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                        Statut
-                      </p>
-                      <p className="mt-2 text-lg font-bold text-[#C9483C]">
-                        {salida.estadoSalida || "-"}
-                      </p>
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-base text-slate-600">
+                      {boatType ? <span>{boatType}</span> : null}
+                      {boatName ? (
+                        <span className="font-medium text-[#3E8DA3]">{boatName}</span>
+                      ) : null}
+                      {showStatusAlert ? (
+                        <span className="rounded-full bg-[#FBE9E7] px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-[#C9483C] ring-1 ring-[#E9B8B2]">
+                          Statut {departureStatus}
+                        </span>
+                      ) : null}
                     </div>
                   </div>
 
-                  <div className="mt-5">
-                    <p className="text-base font-bold text-slate-900">
-                      Offres disponibles
-                    </p>
-                    <p className="mt-1 text-sm text-slate-500">
-                      Prix transport calculé sur la base du dossier courant.
-                    </p>
-
-                    <div className="mt-4 grid gap-3">
+                  <div className="mt-4 grid gap-3">
                       {services.length === 0 && (
                         <span className="text-sm text-slate-500">
                           Aucun service passager disponible.
@@ -2934,29 +2943,90 @@ function ResultatsPageContent() {
                                 onClick={() =>
                                   handleSelectChoice(direction, salida, bestSeat.service)
                                 }
-                                className={`rounded-[24px] border p-5 text-left transition ${
+                                className={`rounded-[24px] border px-5 py-5 text-left transition ${
                                   seatSelected
                                     ? "border-[#163B6D] bg-[#163B6D] text-white"
                                     : "border-slate-300 bg-white hover:bg-slate-50"
                                 }`}
                               >
-                                <div className="flex items-start justify-between gap-4">
-                                  <div>
-                                    <p className="text-xs font-bold uppercase tracking-wide opacity-80">
-                                      {getCommercialCTA("seat")}
-                                    </p>
-                                    <p className="mt-2 text-lg font-bold">Fauteuil</p>
-                                    <p
-                                      className={`mt-1 text-sm ${
-                                        seatSelected ? "text-white/80" : "text-slate-600"
-                                      }`}
-                                    >
-                                      Départ {formatApiTime(salida.horaSalida)} · Arrivée{" "}
-                                      {formatApiTime(salida.horaLlegada)} · Durée{" "}
-                                      {duration}
-                                    </p>
+                                <div className="flex flex-col gap-4 xl:grid xl:grid-cols-[minmax(0,1fr)_18rem] xl:items-center xl:gap-6">
+                                  <div className="min-w-0">
+                                    <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:gap-8">
+                                      <div className="min-w-[9rem]">
+                                        <p className="text-xs font-bold uppercase tracking-wide opacity-80">
+                                          {getCommercialCTA("seat")}
+                                        </p>
+                                        <p className="mt-2 text-[1.8rem] font-bold leading-none">
+                                          Fauteuil
+                                        </p>
+                                      </div>
+
+                                      <div className="min-w-0 flex-1">
+                                        <div
+                                          className={`flex flex-wrap items-center gap-x-4 gap-y-2 text-[1rem] ${
+                                            seatSelected
+                                              ? "text-white/85"
+                                              : "text-slate-600"
+                                          }`}
+                                        >
+                                          <span>
+                                            Départ {formatApiTime(salida.horaSalida)}
+                                          </span>
+                                          <span className="opacity-50">•</span>
+                                          <span>
+                                            Arrivée {formatApiTime(salida.horaLlegada)}
+                                          </span>
+                                          <span className="opacity-50">•</span>
+                                          <span>Durée {duration}</span>
+                                          <span className="opacity-50">•</span>
+                                          <span>{serviceLabel(bestSeat.service)}</span>
+                                        </div>
+
+                                        {bestSeat.source ===
+                                        "selected_roundtrip_reuse_exact_match" ? (
+                                          <p
+                                            className={`mt-3 text-[1rem] ${
+                                              seatSelected
+                                                ? "text-white/75"
+                                                : "text-slate-500"
+                                            }`}
+                                          >
+                                            Tarif calculé pour votre dossier
+                                          </p>
+                                        ) : bestSeat.source ===
+                                          "selected_roundtrip_bundle_exact_match" ? (
+                                          <p
+                                            className={`mt-3 text-[1rem] ${
+                                              seatSelected
+                                                ? "text-white/75"
+                                                : "text-slate-500"
+                                            }`}
+                                          >
+                                            Total aller-retour calculé pour votre voyage.
+                                          </p>
+                                        ) : bestSeat.source ===
+                                          "neutral_round_trip_quote" ? (
+                                          <p
+                                            className={`mt-3 text-[1rem] ${
+                                              seatSelected
+                                                ? "text-white/75"
+                                                : "text-slate-500"
+                                            }`}
+                                          >
+                                            Montant affiché après choix des deux traversées.
+                                          </p>
+                                        ) : null}
+                                      </div>
+                                    </div>
                                   </div>
-                                  <div className="text-right">
+
+                                  <div
+                                    className={`rounded-[22px] px-5 py-4 xl:text-right ${
+                                      seatSelected
+                                        ? "bg-white/10 ring-1 ring-white/20"
+                                        : "bg-white ring-1 ring-slate-300"
+                                    }`}
+                                  >
                                     {bestSeat.source !==
                                     "neutral_round_trip_quote" ? (
                                       <p className="text-xs font-semibold uppercase tracking-wide opacity-75">
@@ -2970,52 +3040,17 @@ function ResultatsPageContent() {
                                       </p>
                                     ) : null}
                                     <p
-                                      className={`mt-1 font-extrabold ${
+                                      className={`mt-2 font-extrabold ${
                                         bestSeat.source ===
                                         "neutral_round_trip_quote"
-                                          ? "text-base leading-snug"
-                                          : "text-2xl"
+                                          ? "text-[1.2rem] leading-snug"
+                                          : "text-[2.1rem] leading-tight"
                                       }`}
                                     >
                                       {bestSeat.total}
                                     </p>
                                   </div>
                                 </div>
-                                <p
-                                  className={`mt-3 text-xs ${
-                                    seatSelected ? "text-white/80" : "text-slate-500"
-                                  }`}
-                                >
-                                  {serviceLabel(bestSeat.service)}
-                                </p>
-                                {bestSeat.source ===
-                                "selected_roundtrip_reuse_exact_match" ? (
-                                  <p
-                                    className={`mt-1 text-[11px] ${
-                                      seatSelected ? "text-white/75" : "text-slate-500"
-                                    }`}
-                                  >
-                                    Tarif calculé pour votre dossier
-                                  </p>
-                                ) : bestSeat.source ===
-                                  "selected_roundtrip_bundle_exact_match" ? (
-                                  <p
-                                    className={`mt-1 text-[11px] ${
-                                      seatSelected ? "text-white/75" : "text-slate-500"
-                                    }`}
-                                  >
-                                    Total aller-retour calculé pour votre voyage.
-                                  </p>
-                                ) : bestSeat.source ===
-                                  "neutral_round_trip_quote" ? (
-                                  <p
-                                    className={`mt-1 text-[11px] ${
-                                      seatSelected ? "text-white/75" : "text-slate-500"
-                                    }`}
-                                  >
-                                    Montant affiché après choix des deux traversées.
-                                  </p>
-                                ) : null}
                               </button>
                             );
                           }
@@ -3028,27 +3063,90 @@ function ResultatsPageContent() {
                                 onClick={() =>
                                   handleSelectChoice(direction, salida, bestCabin.service)
                                 }
-                                className={`rounded-[24px] border p-5 text-left transition ${
+                                className={`rounded-[24px] border px-5 py-5 text-left transition ${
                                   cabinSelected
                                     ? "border-[#F28C28] bg-[#F28C28] text-white"
                                     : "border-slate-300 bg-white hover:bg-slate-50"
                                 }`}
                               >
-                                <div className="flex items-start justify-between gap-4">
-                                  <div>
-                                    <p className="text-xs font-bold uppercase tracking-wide opacity-80">
-                                      {getCommercialCTA("cabin")}
-                                    </p>
-                                    <p className="mt-2 text-lg font-bold">Cabine</p>
-                                    <p
-                                      className={`mt-1 text-sm ${
-                                        cabinSelected ? "text-white/80" : "text-slate-600"
-                                      }`}
-                                    >
-                                      Plus de confort pour voyager sereinement.
-                                    </p>
+                                <div className="flex flex-col gap-4 xl:grid xl:grid-cols-[minmax(0,1fr)_18rem] xl:items-center xl:gap-6">
+                                  <div className="min-w-0">
+                                    <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:gap-8">
+                                      <div className="min-w-[9rem]">
+                                        <p className="text-xs font-bold uppercase tracking-wide opacity-80">
+                                          {getCommercialCTA("cabin")}
+                                        </p>
+                                        <p className="mt-2 text-[1.8rem] font-bold leading-none">
+                                          Cabine
+                                        </p>
+                                      </div>
+
+                                      <div className="min-w-0 flex-1">
+                                        <div
+                                          className={`flex flex-wrap items-center gap-x-4 gap-y-2 text-[1rem] ${
+                                            cabinSelected
+                                              ? "text-white/85"
+                                              : "text-slate-600"
+                                          }`}
+                                        >
+                                          <span>
+                                            Départ {formatApiTime(salida.horaSalida)}
+                                          </span>
+                                          <span className="opacity-50">•</span>
+                                          <span>
+                                            Arrivée {formatApiTime(salida.horaLlegada)}
+                                          </span>
+                                          <span className="opacity-50">•</span>
+                                          <span>Durée {duration}</span>
+                                          <span className="opacity-50">•</span>
+                                          <span>{serviceLabel(bestCabin.service)}</span>
+                                        </div>
+
+                                        {bestCabin.source ===
+                                        "selected_roundtrip_reuse_exact_match" ? (
+                                          <p
+                                            className={`mt-3 text-[1rem] ${
+                                              cabinSelected
+                                                ? "text-white/75"
+                                                : "text-slate-500"
+                                            }`}
+                                          >
+                                            Tarif calculé pour votre dossier
+                                          </p>
+                                        ) : bestCabin.source ===
+                                          "selected_roundtrip_bundle_exact_match" ? (
+                                          <p
+                                            className={`mt-3 text-[1rem] ${
+                                              cabinSelected
+                                                ? "text-white/75"
+                                                : "text-slate-500"
+                                            }`}
+                                          >
+                                            Total aller-retour calculé pour votre voyage.
+                                          </p>
+                                        ) : bestCabin.source ===
+                                          "neutral_round_trip_quote" ? (
+                                          <p
+                                            className={`mt-3 text-[1rem] ${
+                                              cabinSelected
+                                                ? "text-white/75"
+                                                : "text-slate-500"
+                                            }`}
+                                          >
+                                            Montant affiché après choix des deux traversées.
+                                          </p>
+                                        ) : null}
+                                      </div>
+                                    </div>
                                   </div>
-                                  <div className="text-right">
+
+                                  <div
+                                    className={`rounded-[22px] px-5 py-4 xl:text-right ${
+                                      cabinSelected
+                                        ? "bg-white/10 ring-1 ring-white/20"
+                                        : "bg-white ring-1 ring-slate-300"
+                                    }`}
+                                  >
                                     {bestCabin.source !==
                                     "neutral_round_trip_quote" ? (
                                       <p className="text-xs font-semibold uppercase tracking-wide opacity-75">
@@ -3062,52 +3160,17 @@ function ResultatsPageContent() {
                                       </p>
                                     ) : null}
                                     <p
-                                      className={`mt-1 font-extrabold ${
+                                      className={`mt-2 font-extrabold ${
                                         bestCabin.source ===
                                         "neutral_round_trip_quote"
-                                          ? "text-base leading-snug"
-                                          : "text-2xl"
+                                          ? "text-[1.2rem] leading-snug"
+                                          : "text-[2.1rem] leading-tight"
                                       }`}
                                     >
                                       {bestCabin.total}
                                     </p>
                                   </div>
                                 </div>
-                                <p
-                                  className={`mt-3 text-xs ${
-                                    cabinSelected ? "text-white/80" : "text-slate-500"
-                                  }`}
-                                >
-                                  {serviceLabel(bestCabin.service)}
-                                </p>
-                                {bestCabin.source ===
-                                "selected_roundtrip_reuse_exact_match" ? (
-                                  <p
-                                    className={`mt-1 text-[11px] ${
-                                      cabinSelected ? "text-white/75" : "text-slate-500"
-                                    }`}
-                                  >
-                                    Tarif calculé pour votre dossier
-                                  </p>
-                                ) : bestCabin.source ===
-                                  "selected_roundtrip_bundle_exact_match" ? (
-                                  <p
-                                    className={`mt-1 text-[11px] ${
-                                      cabinSelected ? "text-white/75" : "text-slate-500"
-                                    }`}
-                                  >
-                                    Total aller-retour calculé pour votre voyage.
-                                  </p>
-                                ) : bestCabin.source ===
-                                  "neutral_round_trip_quote" ? (
-                                  <p
-                                    className={`mt-1 text-[11px] ${
-                                      cabinSelected ? "text-white/75" : "text-slate-500"
-                                    }`}
-                                  >
-                                    Montant affiché après choix des deux traversées.
-                                  </p>
-                                ) : null}
                               </button>
                             );
                           }
@@ -3161,11 +3224,7 @@ function ResultatsPageContent() {
                           }
 
                           return (
-                            <div
-                              className={`grid gap-3 ${
-                                categoryCards.length > 1 ? "md:grid-cols-2" : ""
-                              }`}
-                            >
+                            <div className="grid gap-3">
                               {categoryCards}
                             </div>
                           );
@@ -3184,7 +3243,6 @@ function ResultatsPageContent() {
                           </span>
                         )
                       ) : null}
-                    </div>
                   </div>
                 </article>
               );
@@ -3492,7 +3550,7 @@ function ResultatsPageContent() {
                     </p>
                   </div>
 
-                  <div className="lg:grid lg:grid-cols-2 lg:gap-8 lg:items-start">
+                  <div className="space-y-10">
                     <div className="min-w-0">
                       <div className="mb-3 hidden items-center gap-3 lg:flex">
                         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#163B6D] text-sm font-bold text-white">
@@ -3516,7 +3574,7 @@ function ResultatsPageContent() {
                         outboundDeparturesFiltered
                       )}
                     </div>
-                    <div className="min-w-0 lg:border-l lg:border-slate-200 lg:pl-8">
+                    <div className="min-w-0 border-t border-slate-200 pt-8">
                       <div className="mb-3 hidden items-center gap-3 lg:flex">
                         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#F28C28] text-sm font-bold text-white">
                           2

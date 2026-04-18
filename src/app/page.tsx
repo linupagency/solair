@@ -181,6 +181,7 @@ const HOME_HEADER_TOP_LINKS: HomeHeaderLink[] = [
  * puis remplace ce chemin si besoin.
  */
 const HOME_HERO_BACKGROUND_IMAGE = "/hero-solair-home.jpg";
+const AVAILABLE_DATES_LOOKAHEAD_DAYS = 210;
 
 type VehicleTrailerRowKey = Extract<
   VehicleUiRowKey,
@@ -1458,7 +1459,7 @@ export default function HomePage() {
             origen
           )}&destino=${encodeURIComponent(
             destino
-          )}&startDate=${start}&days=45&concurrency=8`,
+          )}&startDate=${start}&days=${AVAILABLE_DATES_LOOKAHEAD_DAYS}&concurrency=8`,
           { cache: "no-store" }
         );
         const outboundJson: AvailableDatesApiResponse =
@@ -1485,7 +1486,7 @@ export default function HomePage() {
               destino
             )}&destino=${encodeURIComponent(
               origen
-            )}&startDate=${start}&days=45&concurrency=8`,
+            )}&startDate=${start}&days=${AVAILABLE_DATES_LOOKAHEAD_DAYS}&concurrency=8`,
             { cache: "no-store" }
           );
           const inboundJson: AvailableDatesApiResponse =

@@ -68,7 +68,7 @@ export async function GET(request: NextRequest) {
   const startDate = (searchParams.get("startDate") || "").trim();
   const daysRaw = Number(searchParams.get("days") || "45");
   const days = Number.isFinite(daysRaw)
-    ? Math.min(90, Math.max(1, Math.floor(daysRaw)))
+    ? Math.min(365, Math.max(1, Math.floor(daysRaw)))
     : 45;
   const concurrencyRaw = Number(searchParams.get("concurrency") || "8");
   const concurrency = Number.isFinite(concurrencyRaw)
