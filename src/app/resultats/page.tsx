@@ -2999,17 +2999,17 @@ function ResultatsPageContent() {
               return (
                 <article
                   key={`${direction}-${salida.fechaSalida}-${salida.horaSalida}-${index}`}
-                  className="rounded-[28px] border border-slate-200 bg-white px-6 py-5 shadow-[0_8px_18px_rgba(15,23,42,0.04)]"
+                  className="rounded-[28px] border border-slate-200 bg-white px-4 py-4 shadow-[0_8px_18px_rgba(15,23,42,0.04)] md:px-6 md:py-5"
                 >
                   <div className="pb-1 md:-mx-2 md:overflow-x-auto md:px-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
                     <div className="min-w-0 md:min-w-[52rem]">
-                      <div className="grid gap-5">
-                        <div className="grid gap-4 sm:grid-cols-2 md:flex md:items-center md:gap-8">
+                      <div className="grid gap-4 md:gap-5">
+                        <div className="grid gap-3 sm:grid-cols-2 md:flex md:items-center md:gap-8">
                           <div className="min-w-0 md:min-w-[7rem]">
-                            <p className="text-[2.6rem] font-bold leading-none text-slate-900">
+                            <p className="text-[2.15rem] font-bold leading-none text-slate-900 md:text-[2.6rem]">
                               {formatApiTime(salida.horaSalida)}
                             </p>
-                            <p className="mt-1 text-lg uppercase text-slate-700">
+                            <p className="mt-1 text-base uppercase text-slate-700 md:text-lg">
                               {originLabel || getSalidaOrigenCode(salida)}
                             </p>
                           </div>
@@ -3020,22 +3020,22 @@ function ResultatsPageContent() {
                               <span className="text-base">◷</span>
                               <span className="h-px flex-1 bg-slate-300" />
                             </div>
-                            <p className="text-[1.05rem] font-medium text-slate-500 md:mt-2">
+                            <p className="text-sm font-medium text-slate-500 md:mt-2 md:text-[1.05rem]">
                               Durée {durationSummary}
                             </p>
                           </div>
 
                           <div className="min-w-0 md:min-w-[7rem]">
-                            <p className="text-[2.6rem] font-bold leading-none text-slate-900">
+                            <p className="text-[2.15rem] font-bold leading-none text-slate-900 md:text-[2.6rem]">
                               {formatApiTime(salida.horaLlegada)}
                             </p>
-                            <p className="mt-1 text-lg uppercase text-slate-700">
+                            <p className="mt-1 text-base uppercase text-slate-700 md:text-lg">
                               {destinationLabel || getSalidaDestinoCode(salida)}
                             </p>
                           </div>
 
                           <div className="min-w-0 sm:col-span-2 md:flex-1">
-                            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-base text-slate-600">
+                            <div className="flex flex-wrap items-center gap-x-2 gap-y-2 text-sm text-slate-600 md:gap-x-3 md:text-base">
                               {boatType ? <span>{boatType}</span> : null}
                               {boatName ? (
                                 <span className="font-medium text-[#3E8DA3]">
@@ -3367,20 +3367,20 @@ function ResultatsPageContent() {
                                 onClick={() =>
                                   handleSelectChoice(direction, salida, bestSeat.service)
                                 }
-                                className={`rounded-[26px] border px-6 py-5 text-left text-white shadow-[0_14px_30px_rgba(16,45,84,0.18)] transition hover:-translate-y-px ${
+                                className={`rounded-[22px] border px-4 py-4 text-left text-white shadow-[0_14px_30px_rgba(16,45,84,0.18)] transition hover:-translate-y-px md:rounded-[26px] md:px-6 md:py-5 ${
                                   seatSelected
                                     ? "border-[#F7C948] bg-[#163B6D] ring-2 ring-[#F7C948]"
                                     : "border-[#163B6D] bg-[#163B6D] hover:bg-[#1B447A]"
                                 }`}
                               >
-                                <div className="grid gap-4 md:grid-cols-[12rem_minmax(0,1fr)_18rem] md:items-center md:gap-6">
+                                <div className="grid gap-3 md:grid-cols-[12rem_minmax(0,1fr)_18rem] md:items-center md:gap-6">
                                   <div className="min-w-0">
-                                    <p className="text-[1.35rem] font-bold leading-none text-white">
+                                    <p className="text-[1.05rem] font-bold leading-none text-white md:text-[1.35rem]">
                                       Fauteuil
                                     </p>
                                   </div>
 
-                                  <div className="text-sm leading-relaxed text-white/85">
+                                  <div className="text-[0.9rem] leading-relaxed text-white/85 md:text-sm">
                                     <p>
                                       {bestSeat.source ===
                                       "selected_roundtrip_reuse_exact_match"
@@ -3396,7 +3396,7 @@ function ResultatsPageContent() {
                                   </div>
 
                                   <div className="flex justify-start md:justify-end">
-                                    <span className="inline-flex min-h-[3.65rem] shrink-0 items-center justify-center rounded-[14px] bg-[#FFC928] px-5 text-sm font-extrabold uppercase tracking-[0.06em] text-[#163B6D] shadow-[0_10px_24px_rgba(255,201,40,0.26)]">
+                                    <span className="inline-flex min-h-[2.9rem] shrink-0 items-center justify-center rounded-[12px] bg-[#FFC928] px-4 text-[0.72rem] font-extrabold uppercase tracking-[0.05em] text-[#163B6D] shadow-[0_10px_24px_rgba(255,201,40,0.26)] md:min-h-[3.65rem] md:rounded-[14px] md:px-5 md:text-sm">
                                       {seatSelected ? "Sélectionné" : "Sélectionner"}
                                     </span>
                                   </div>
@@ -3413,20 +3413,20 @@ function ResultatsPageContent() {
                                 onClick={() =>
                                   handleSelectChoice(direction, salida, bestCabin.service)
                                 }
-                                className={`rounded-[26px] border px-6 py-5 text-left text-white shadow-[0_14px_30px_rgba(16,45,84,0.18)] transition hover:-translate-y-px ${
+                                className={`rounded-[22px] border px-4 py-4 text-left text-white shadow-[0_14px_30px_rgba(16,45,84,0.18)] transition hover:-translate-y-px md:rounded-[26px] md:px-6 md:py-5 ${
                                   cabinSelected
                                     ? "border-[#F7C948] bg-[#163B6D] ring-2 ring-[#F7C948]"
                                     : "border-[#163B6D] bg-[#163B6D] hover:bg-[#1B447A]"
                                 }`}
                               >
-                                <div className="grid gap-4 md:grid-cols-[12rem_minmax(0,1fr)_18rem] md:items-center md:gap-6">
+                                <div className="grid gap-3 md:grid-cols-[12rem_minmax(0,1fr)_18rem] md:items-center md:gap-6">
                                   <div className="min-w-0">
-                                    <p className="text-[1.35rem] font-bold leading-none text-white">
+                                    <p className="text-[1.05rem] font-bold leading-none text-white md:text-[1.35rem]">
                                       Cabine
                                     </p>
                                   </div>
 
-                                  <div className="text-sm leading-relaxed text-white/85">
+                                  <div className="text-[0.9rem] leading-relaxed text-white/85 md:text-sm">
                                     <p>
                                       {bestCabin.source ===
                                       "selected_roundtrip_reuse_exact_match"
@@ -3442,7 +3442,7 @@ function ResultatsPageContent() {
                                   </div>
 
                                   <div className="flex justify-start md:justify-end">
-                                    <span className="inline-flex min-h-[3.65rem] shrink-0 items-center justify-center rounded-[14px] bg-[#FFC928] px-5 text-sm font-extrabold uppercase tracking-[0.06em] text-[#163B6D] shadow-[0_10px_24px_rgba(255,201,40,0.26)]">
+                                    <span className="inline-flex min-h-[2.9rem] shrink-0 items-center justify-center rounded-[12px] bg-[#FFC928] px-4 text-[0.72rem] font-extrabold uppercase tracking-[0.05em] text-[#163B6D] shadow-[0_10px_24px_rgba(255,201,40,0.26)] md:min-h-[3.65rem] md:rounded-[14px] md:px-5 md:text-sm">
                                       {cabinSelected ? "Sélectionné" : "Sélectionner"}
                                     </span>
                                   </div>
