@@ -48,7 +48,6 @@ import {
 import { getTarificacionRawLinesFromSoapResult } from "@/lib/armas/tarificacion-normalize";
 import {
   eurosFromDisplay,
-  getCommercialCTA,
   getCommercialKind,
   getCommercialLabel,
   type CommercialOfferKind,
@@ -106,6 +105,13 @@ type DeparturesApiResponse = {
       };
     };
   };
+};
+
+type AvailableDatesApiResponse = {
+  ok: boolean;
+  message?: string;
+  error?: string;
+  availableDates?: string[];
 };
 
 type PricingLine = {
@@ -185,6 +191,18 @@ type PricingRawParts = {
 
 const ROUND_TRIP_CARD_NEUTRAL_PRICE_LABEL =
   "Tarif calculé après sélection de l'aller et du retour";
+const DATE_SUGGESTION_LOOKAROUND_DAYS = 21;
+const DATE_SUGGESTION_CARD_COUNT = 3;
+const MOROCCO_PORT_CODES = new Set([
+  "PTM",
+  "TNG",
+  "TNGM",
+  "NDR",
+  "NAD",
+  "AHU",
+  "HOC",
+  "CAS",
+]);
 
 function normalizeArray<T>(value?: T[] | T): T[] {
   if (!value) return [];
@@ -203,9 +221,39 @@ function formatApiDate(value?: string) {
   return `${value.slice(6, 8)}/${value.slice(4, 6)}/${value.slice(0, 4)}`;
 }
 
+function formatApiDateLongFr(value?: string) {
+  if (!value || value.length !== 8) return value || "-";
+  const year = Number(value.slice(0, 4));
+  const month = Number(value.slice(4, 6));
+  const day = Number(value.slice(6, 8));
+  if (!year || !month || !day) return formatApiDate(value);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return new Intl.DateTimeFormat("fr-FR", {
+    weekday: "short",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(date);
+}
+
 function formatApiTime(value?: string) {
   if (!value || value.length !== 4) return value || "-";
   return `${value.slice(0, 2)}:${value.slice(2, 4)}`;
+}
+
+function shiftApiDate(value: string, days: number) {
+  const digits = normalizeSearchDate(value);
+  if (!/^\d{8}$/.test(digits)) return digits;
+  const year = Number(digits.slice(0, 4));
+  const month = Number(digits.slice(4, 6));
+  const day = Number(digits.slice(6, 8));
+  const utc = new Date(Date.UTC(year, month - 1, day));
+  utc.setUTCDate(utc.getUTCDate() + days);
+  const yy = utc.getUTCFullYear();
+  const mm = String(utc.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(utc.getUTCDate()).padStart(2, "0");
+  return `${yy}${mm}${dd}`;
 }
 
 function formatMoney(value?: string | number) {
@@ -249,6 +297,144 @@ function formatDurationFromTimes(horaSalida?: string, horaLlegada?: string) {
   if (h <= 0 && m <= 0) return "-";
   if (m === 0) return `${h} h`;
   return `${h} h ${String(m).padStart(2, "0")}`;
+}
+
+function getPortTimeZone(port?: {
+  codigoPuerto?: string;
+  textoCorto?: string;
+  textoLargo?: string;
+}) {
+  const code = String(port?.codigoPuerto || "").trim().toUpperCase();
+  const text = `${String(port?.textoCorto || "")} ${String(port?.textoLargo || "")}`
+    .trim()
+    .toUpperCase();
+
+  if (
+    MOROCCO_PORT_CODES.has(code) ||
+    /TANGER|TÁNGER|NADOR|AL HOCEIMA|MAROC|MARRUECOS|CASABLANCA/.test(text)
+  ) {
+    return "Africa/Casablanca";
+  }
+
+  return "Europe/Madrid";
+}
+
+function getTimeZoneOffsetMinutes(timeZone: string, date: Date) {
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  });
+
+  const parts = formatter.formatToParts(date);
+  const lookup = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  const year = Number(lookup.year || "0");
+  const month = Number(lookup.month || "0");
+  const day = Number(lookup.day || "0");
+  const hour = Number(lookup.hour || "0");
+  const minute = Number(lookup.minute || "0");
+  const second = Number(lookup.second || "0");
+
+  return (
+    (Date.UTC(year, month - 1, day, hour, minute, second) - date.getTime()) /
+    60000
+  );
+}
+
+function zonedDateTimeToUtcMs(
+  dateValue: string,
+  timeValue: string,
+  timeZone: string
+) {
+  const dateDigits = normalizeSearchDate(dateValue);
+  if (!/^\d{8}$/.test(dateDigits) || !/^\d{4}$/.test(timeValue)) return null;
+
+  const year = Number(dateDigits.slice(0, 4));
+  const month = Number(dateDigits.slice(4, 6));
+  const day = Number(dateDigits.slice(6, 8));
+  const hour = Number(timeValue.slice(0, 2));
+  const minute = Number(timeValue.slice(2, 4));
+
+  let utcGuess = Date.UTC(year, month - 1, day, hour, minute, 0);
+  for (let i = 0; i < 4; i += 1) {
+    const offset = getTimeZoneOffsetMinutes(timeZone, new Date(utcGuess));
+    const nextGuess = Date.UTC(year, month - 1, day, hour, minute, 0) - offset * 60000;
+    if (nextGuess === utcGuess) break;
+    utcGuess = nextGuess;
+  }
+
+  return utcGuess;
+}
+
+function formatDurationForSalida(salida: Salida) {
+  const fallback = formatDurationFromTimes(salida.horaSalida, salida.horaLlegada);
+  const departureDate = normalizeSearchDate(salida.fechaSalida);
+  const arrivalDate =
+    normalizeSearchDate(salida.fechaLlegada) || departureDate;
+  const departureTime = String(salida.horaSalida || "").trim();
+  const arrivalTime = String(salida.horaLlegada || "").trim();
+
+  if (!departureDate || !departureTime || !arrivalTime) return fallback;
+
+  const departureZone = getPortTimeZone(salida.trayectoEntidad?.puertoOrigenEntidad);
+  const arrivalZone = getPortTimeZone(salida.trayectoEntidad?.puertoDestinoEntidad);
+  const departureUtc = zonedDateTimeToUtcMs(
+    departureDate,
+    departureTime,
+    departureZone
+  );
+  let arrivalUtc = zonedDateTimeToUtcMs(arrivalDate, arrivalTime, arrivalZone);
+
+  if (departureUtc === null || arrivalUtc === null) return fallback;
+  if (arrivalUtc <= departureUtc) {
+    arrivalUtc = zonedDateTimeToUtcMs(
+      shiftApiDate(arrivalDate, 1),
+      arrivalTime,
+      arrivalZone
+    );
+    if (arrivalUtc === null) return fallback;
+  }
+
+  const diff = Math.round((arrivalUtc - departureUtc) / 60000);
+  if (!Number.isFinite(diff) || diff <= 0) return fallback;
+
+  const hours = Math.floor(diff / 60);
+  const minutes = diff % 60;
+  if (minutes === 0) return `${hours} h`;
+  return `${hours} h ${String(minutes).padStart(2, "0")}`;
+}
+
+function pickSuggestedDates(
+  availableDates: string[],
+  selectedDate: string,
+  maxCards = DATE_SUGGESTION_CARD_COUNT
+) {
+  const normalized = Array.from(
+    new Set(availableDates.map((value) => normalizeSearchDate(value)).filter(Boolean))
+  ).sort();
+  if (normalized.length <= maxCards) return normalized;
+
+  const target = normalizeSearchDate(selectedDate);
+  const selectedIndex = normalized.indexOf(target);
+
+  if (selectedIndex >= 0) {
+    let start = Math.max(0, selectedIndex - Math.floor(maxCards / 2));
+    let end = start + maxCards;
+    if (end > normalized.length) {
+      end = normalized.length;
+      start = Math.max(0, end - maxCards);
+    }
+    return normalized.slice(start, end);
+  }
+
+  const future = normalized.filter((date) => date >= target);
+  if (future.length >= maxCards) return future.slice(0, maxCards);
+  return normalized.slice(Math.max(0, normalized.length - maxCards));
 }
 
 function discountLabel(code: string, apiLabel?: string) {
@@ -1018,6 +1204,14 @@ function ResultatsPageContent() {
 
   const [outboundDepartures, setOutboundDepartures] = useState<Salida[]>([]);
   const [inboundDepartures, setInboundDepartures] = useState<Salida[]>([]);
+  const [availableOutboundDateSuggestions, setAvailableOutboundDateSuggestions] =
+    useState<string[]>([]);
+  const [availableInboundDateSuggestions, setAvailableInboundDateSuggestions] =
+    useState<string[]>([]);
+  const [loadingOutboundDateSuggestions, setLoadingOutboundDateSuggestions] =
+    useState(false);
+  const [loadingInboundDateSuggestions, setLoadingInboundDateSuggestions] =
+    useState(false);
 
   const [selectedOutbound, setSelectedOutbound] = useState<SelectedChoice | null>(
     null
@@ -1126,6 +1320,99 @@ function ResultatsPageContent() {
       });
     }
   }, [flow, selectedInbound, selectedOutbound]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function fetchAvailableDateSuggestions(
+      origen: string,
+      destino: string,
+      selectedDate: string
+    ) {
+      const normalizedDate = normalizeSearchDate(selectedDate);
+      if (!origen || !destino || !normalizedDate) return [];
+
+      const startDate = shiftApiDate(normalizedDate, -7);
+      const response = await fetch(
+        `/api/armas/test-available-dates?origen=${encodeURIComponent(
+          origen
+        )}&destino=${encodeURIComponent(
+          destino
+        )}&startDate=${encodeURIComponent(
+          startDate
+        )}&days=${DATE_SUGGESTION_LOOKAROUND_DAYS}&concurrency=8`,
+        { cache: "no-store" }
+      );
+
+      const json: AvailableDatesApiResponse = await response.json();
+      if (!response.ok || !json.ok) {
+        throw new Error(
+          json.error ||
+            json.message ||
+            "Impossible de charger les dates disponibles."
+        );
+      }
+
+      return pickSuggestedDates(json.availableDates || [], normalizedDate);
+    }
+
+    async function loadDateSuggestions() {
+      if (!flow?.search.origen || !flow.search.destino || !flow.search.fechaIda) {
+        setAvailableOutboundDateSuggestions([]);
+        setAvailableInboundDateSuggestions([]);
+        return;
+      }
+
+      setLoadingOutboundDateSuggestions(true);
+      setLoadingInboundDateSuggestions(flow.tripType === "round_trip");
+
+      try {
+        const outboundPromise = fetchAvailableDateSuggestions(
+          flow.search.origen,
+          flow.search.destino,
+          flow.search.fechaIda
+        );
+
+        const inboundPromise =
+          flow.tripType === "round_trip" && flow.search.fechaVuelta
+            ? fetchAvailableDateSuggestions(
+                flow.search.destino,
+                flow.search.origen,
+                flow.search.fechaVuelta
+              )
+            : Promise.resolve<string[]>([]);
+
+        const [outboundDates, inboundDates] = await Promise.all([
+          outboundPromise,
+          inboundPromise,
+        ]);
+
+        if (cancelled) return;
+        setAvailableOutboundDateSuggestions(outboundDates);
+        setAvailableInboundDateSuggestions(inboundDates);
+      } catch {
+        if (cancelled) return;
+        setAvailableOutboundDateSuggestions([]);
+        setAvailableInboundDateSuggestions([]);
+      } finally {
+        if (cancelled) return;
+        setLoadingOutboundDateSuggestions(false);
+        setLoadingInboundDateSuggestions(false);
+      }
+    }
+
+    void loadDateSuggestions();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    flow?.tripType,
+    flow?.search.origen,
+    flow?.search.destino,
+    flow?.search.fechaIda,
+    flow?.search.fechaVuelta,
+  ]);
 
   useEffect(() => {
     async function loadDepartures() {
@@ -2469,6 +2756,49 @@ function ResultatsPageContent() {
     router.push("/hebergement");
   }
 
+  function handleSelectAlternativeDate(
+    direction: JourneyDirection,
+    nextDate: string
+  ) {
+    if (!flow) return;
+
+    const normalizedDate = normalizeSearchDate(nextDate);
+    if (!normalizedDate) return;
+
+    const currentDate =
+      direction === "outbound"
+        ? normalizeSearchDate(flow.search.fechaIda)
+        : normalizeSearchDate(flow.search.fechaVuelta || flow.search.fechaIda);
+
+    if (normalizedDate === currentDate) return;
+
+    if (direction === "outbound") {
+      setSelectedOutbound(null);
+    } else {
+      setSelectedInbound(null);
+    }
+    setSelectedRoundTripTotals(null);
+
+    const nextFlow: BookingFlow = {
+      ...flow,
+      search: {
+        ...flow.search,
+        fechaIda:
+          direction === "outbound" ? normalizedDate : flow.search.fechaIda,
+        fechaVuelta:
+          direction === "inbound"
+            ? normalizedDate
+            : flow.search.fechaVuelta || "",
+      },
+      outbound: direction === "outbound" ? {} : flow.outbound,
+      inbound: direction === "inbound" ? {} : flow.inbound,
+      totals: {},
+    };
+
+    const normalized = setBookingFlow(nextFlow);
+    setFlowState(normalized);
+  }
+
   const headerTitle = useMemo(() => {
     if (!flow) return "Résultats";
     if (flow.tripType === "round_trip") {
@@ -2498,12 +2828,105 @@ function ResultatsPageContent() {
     if (!flow) return null;
 
     const bookingFlow = flow;
+    const sectionSearchDate =
+      direction === "outbound"
+        ? normalizeSearchDate(bookingFlow.search.fechaIda)
+        : normalizeSearchDate(
+            bookingFlow.search.fechaVuelta || bookingFlow.search.fechaIda
+          );
+    const sectionDateSuggestions =
+      direction === "outbound"
+        ? availableOutboundDateSuggestions
+        : availableInboundDateSuggestions;
+    const loadingDateSuggestions =
+      direction === "outbound"
+        ? loadingOutboundDateSuggestions
+        : loadingInboundDateSuggestions;
+    const sectionMinPrice = (() => {
+      let min: number | null = null;
+
+      for (const salida of departures) {
+        const services = normalizeArray(
+          salida.serviciosVentasEntidad?.servicioVentaEntidad
+        ).filter(
+          (service) =>
+            service.disponibilidad !== false &&
+            !!service.codigoServicioVenta &&
+            !!service.tipoServicioVenta &&
+            shouldRequestPricingForTransportCommercialCards(
+              bookingFlow,
+              salida,
+              service
+            )
+        );
+
+        for (const service of services) {
+          const state =
+            pricingMap[getPricingKey(direction, salida, service, bookingFlow)];
+          if (state?.status !== "success") continue;
+          const amount = eurosFromDisplay(state.total || "");
+          if (amount === null || amount <= 0) continue;
+          if (min === null || amount < min) {
+            min = amount;
+          }
+        }
+      }
+
+      return min;
+    })();
 
     return (
       <SectionCard
         title={getDirectionTitle(direction, bookingFlow)}
         subtitle={getDirectionSubtitle(direction, bookingFlow)}
       >
+        <div className="mb-6 overflow-hidden rounded-[26px] border border-slate-200 bg-white shadow-[0_10px_24px_rgba(15,23,42,0.06)]">
+          <div className="flex items-center gap-3 border-b border-slate-100 px-5 py-4 text-slate-700">
+            <span className="text-lg">⛴</span>
+            <p className="text-sm font-semibold sm:text-base">
+              {direction === "outbound" ? "Aller" : "Retour"} {getDirectionSubtitle(direction, bookingFlow)}
+            </p>
+          </div>
+          <div className="grid gap-px bg-slate-200 md:grid-cols-3">
+            {(sectionDateSuggestions.length > 0
+              ? sectionDateSuggestions
+              : [sectionSearchDate]
+            ).map((date) => {
+              const isSelected = date === sectionSearchDate;
+              return (
+                <button
+                  key={`${direction}-date-${date}`}
+                  type="button"
+                  onClick={() => handleSelectAlternativeDate(direction, date)}
+                  disabled={loadingDepartures || loadingDateSuggestions || isSelected}
+                  className={`relative min-h-[8.2rem] bg-white px-5 py-5 text-center transition ${
+                    isSelected
+                      ? "shadow-[inset_0_-4px_0_0_#F28C28]"
+                      : "hover:bg-slate-50"
+                  } disabled:cursor-default`}
+                >
+                  <p className="text-[1.15rem] font-bold text-slate-700 sm:text-[1.35rem]">
+                    {formatApiDateLongFr(date)}
+                  </p>
+                  <p
+                    className={`mt-3 text-base font-semibold ${
+                      isSelected && sectionMinPrice !== null
+                        ? "text-[#D94A3A]"
+                        : "text-slate-500"
+                    }`}
+                  >
+                    {isSelected
+                      ? sectionMinPrice !== null
+                        ? `De ${formatMoney(sectionMinPrice)}`
+                        : "Date sélectionnée"
+                      : "Disponibilité confirmée"}
+                  </p>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         {departures.length === 0 ? (
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
             Aucune traversée disponible pour la date sélectionnée.
@@ -2555,10 +2978,7 @@ function ResultatsPageContent() {
                 return st == null || st.status === "loading";
               });
 
-              const durationSummary = formatDurationFromTimes(
-                salida.horaSalida,
-                salida.horaLlegada
-              );
+              const durationSummary = formatDurationForSalida(salida);
               const boatName = String(salida.barcoEntidad?.textoCorto || "").trim();
               const boatType = String(salida.barcoEntidad?.tipoBarco || "").trim();
               const originLabel = String(
@@ -2579,52 +2999,59 @@ function ResultatsPageContent() {
               return (
                 <article
                   key={`${direction}-${salida.fechaSalida}-${salida.horaSalida}-${index}`}
-                  className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_8px_18px_rgba(15,23,42,0.04)]"
+                  className="rounded-[28px] border border-slate-200 bg-white px-6 py-5 shadow-[0_8px_18px_rgba(15,23,42,0.04)]"
                 >
-                  <div className="flex flex-col gap-3 border-b border-slate-100 pb-4 xl:grid xl:grid-cols-[7rem_10rem_7rem_minmax(0,1fr)] xl:items-center xl:gap-6">
-                    <div>
-                      <p className="text-[2.2rem] font-bold leading-none text-slate-900">
-                        {formatApiTime(salida.horaSalida)}
-                      </p>
-                      <p className="mt-1 text-lg text-slate-700">
-                        {originLabel || getSalidaOrigenCode(salida)}
-                      </p>
-                    </div>
+                  <div className="-mx-2 overflow-x-auto px-2 pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+                    <div className="min-w-[52rem]">
+                      <div className="grid gap-5">
+                        <div className="flex items-center gap-8">
+                          <div className="min-w-[7rem]">
+                            <p className="text-[2.6rem] font-bold leading-none text-slate-900">
+                              {formatApiTime(salida.horaSalida)}
+                            </p>
+                            <p className="mt-1 text-lg uppercase text-slate-700">
+                              {originLabel || getSalidaOrigenCode(salida)}
+                            </p>
+                          </div>
 
-                    <div className="flex flex-col items-start text-slate-400 xl:items-center">
-                      <div className="hidden w-full items-center gap-3 xl:flex">
-                        <span className="h-px flex-1 bg-slate-300" />
-                        <span className="text-xl">◷</span>
-                        <span className="h-px flex-1 bg-slate-300" />
-                      </div>
-                      <p className="mt-1 text-lg text-slate-500 xl:mt-2">
-                        Durée {durationSummary}
-                      </p>
-                    </div>
+                          <div className="min-w-[10rem] text-center text-slate-400">
+                            <div className="flex items-center gap-3">
+                              <span className="h-px flex-1 bg-slate-300" />
+                              <span className="text-base">◷</span>
+                              <span className="h-px flex-1 bg-slate-300" />
+                            </div>
+                            <p className="mt-2 text-[1.05rem] font-medium text-slate-500">
+                              Durée {durationSummary}
+                            </p>
+                          </div>
 
-                    <div>
-                      <p className="text-[2.2rem] font-bold leading-none text-slate-900">
-                        {formatApiTime(salida.horaLlegada)}
-                      </p>
-                      <p className="mt-1 text-lg text-slate-700">
-                        {destinationLabel || getSalidaDestinoCode(salida)}
-                      </p>
-                    </div>
+                          <div className="min-w-[7rem]">
+                            <p className="text-[2.6rem] font-bold leading-none text-slate-900">
+                              {formatApiTime(salida.horaLlegada)}
+                            </p>
+                            <p className="mt-1 text-lg uppercase text-slate-700">
+                              {destinationLabel || getSalidaDestinoCode(salida)}
+                            </p>
+                          </div>
 
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-base text-slate-600">
-                      {boatType ? <span>{boatType}</span> : null}
-                      {boatName ? (
-                        <span className="font-medium text-[#3E8DA3]">{boatName}</span>
-                      ) : null}
-                      {showStatusAlert ? (
-                        <span className="rounded-full bg-[#FBE9E7] px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-[#C9483C] ring-1 ring-[#E9B8B2]">
-                          Statut {departureStatus}
-                        </span>
-                      ) : null}
-                    </div>
-                  </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-base text-slate-600">
+                              {boatType ? <span>{boatType}</span> : null}
+                              {boatName ? (
+                                <span className="font-medium text-[#3E8DA3]">
+                                  {boatName}
+                                </span>
+                              ) : null}
+                              {showStatusAlert ? (
+                                <span className="rounded-full bg-[#FBE9E7] px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-[#C9483C] ring-1 ring-[#E9B8B2]">
+                                  Statut {departureStatus}
+                                </span>
+                              ) : null}
+                            </div>
+                          </div>
+                        </div>
 
-                  <div className="mt-4 grid gap-3">
+                        <div className="grid gap-3 border-t border-slate-100 pt-5">
                       {services.length === 0 && (
                         <span className="text-sm text-slate-500">
                           Aucun service passager disponible.
@@ -2873,10 +3300,7 @@ function ResultatsPageContent() {
                               )
                             : false;
 
-                          const duration = formatDurationFromTimes(
-                            salida.horaSalida,
-                            salida.horaLlegada
-                          );
+                          const duration = formatDurationForSalida(salida);
 
                           if (isArmasRtPricingDebugEnabled()) {
                             const boatCode = String(
@@ -2943,112 +3367,38 @@ function ResultatsPageContent() {
                                 onClick={() =>
                                   handleSelectChoice(direction, salida, bestSeat.service)
                                 }
-                                className={`rounded-[24px] border px-5 py-5 text-left transition ${
+                                className={`rounded-[26px] border px-6 py-5 text-left text-white shadow-[0_14px_30px_rgba(16,45,84,0.18)] transition hover:-translate-y-px ${
                                   seatSelected
-                                    ? "border-[#163B6D] bg-[#163B6D] text-white"
-                                    : "border-slate-300 bg-white hover:bg-slate-50"
+                                    ? "border-[#F7C948] bg-[#163B6D] ring-2 ring-[#F7C948]"
+                                    : "border-[#163B6D] bg-[#163B6D] hover:bg-[#1B447A]"
                                 }`}
                               >
-                                <div className="flex flex-col gap-4 xl:grid xl:grid-cols-[minmax(0,1fr)_18rem] xl:items-center xl:gap-6">
+                                <div className="grid grid-cols-[12rem_minmax(0,1fr)_18rem] items-center gap-6">
                                   <div className="min-w-0">
-                                    <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:gap-8">
-                                      <div className="min-w-[9rem]">
-                                        <p className="text-xs font-bold uppercase tracking-wide opacity-80">
-                                          {getCommercialCTA("seat")}
-                                        </p>
-                                        <p className="mt-2 text-[1.8rem] font-bold leading-none">
-                                          Fauteuil
-                                        </p>
-                                      </div>
-
-                                      <div className="min-w-0 flex-1">
-                                        <div
-                                          className={`flex flex-wrap items-center gap-x-4 gap-y-2 text-[1rem] ${
-                                            seatSelected
-                                              ? "text-white/85"
-                                              : "text-slate-600"
-                                          }`}
-                                        >
-                                          <span>
-                                            Départ {formatApiTime(salida.horaSalida)}
-                                          </span>
-                                          <span className="opacity-50">•</span>
-                                          <span>
-                                            Arrivée {formatApiTime(salida.horaLlegada)}
-                                          </span>
-                                          <span className="opacity-50">•</span>
-                                          <span>Durée {duration}</span>
-                                          <span className="opacity-50">•</span>
-                                          <span>{serviceLabel(bestSeat.service)}</span>
-                                        </div>
-
-                                        {bestSeat.source ===
-                                        "selected_roundtrip_reuse_exact_match" ? (
-                                          <p
-                                            className={`mt-3 text-[1rem] ${
-                                              seatSelected
-                                                ? "text-white/75"
-                                                : "text-slate-500"
-                                            }`}
-                                          >
-                                            Tarif calculé pour votre dossier
-                                          </p>
-                                        ) : bestSeat.source ===
-                                          "selected_roundtrip_bundle_exact_match" ? (
-                                          <p
-                                            className={`mt-3 text-[1rem] ${
-                                              seatSelected
-                                                ? "text-white/75"
-                                                : "text-slate-500"
-                                            }`}
-                                          >
-                                            Total aller-retour calculé pour votre voyage.
-                                          </p>
-                                        ) : bestSeat.source ===
-                                          "neutral_round_trip_quote" ? (
-                                          <p
-                                            className={`mt-3 text-[1rem] ${
-                                              seatSelected
-                                                ? "text-white/75"
-                                                : "text-slate-500"
-                                            }`}
-                                          >
-                                            Montant affiché après choix des deux traversées.
-                                          </p>
-                                        ) : null}
-                                      </div>
-                                    </div>
+                                    <p className="text-[1.35rem] font-bold leading-none text-white">
+                                        Fauteuil
+                                      </p>
                                   </div>
 
-                                  <div
-                                    className={`rounded-[22px] px-5 py-4 xl:text-right ${
-                                      seatSelected
-                                        ? "bg-white/10 ring-1 ring-white/20"
-                                        : "bg-white ring-1 ring-slate-300"
-                                    }`}
-                                  >
-                                    {bestSeat.source !==
-                                    "neutral_round_trip_quote" ? (
-                                      <p className="text-xs font-semibold uppercase tracking-wide opacity-75">
-                                        {bestSeat.source ===
-                                        "selected_roundtrip_reuse_exact_match"
-                                          ? "Tarif dossier"
+                                  <div className="text-sm leading-relaxed text-white/85">
+                                    <p>
+                                      {bestSeat.source ===
+                                      "selected_roundtrip_reuse_exact_match"
+                                        ? "Tarif confirmé pour votre dossier."
+                                        : bestSeat.source ===
+                                            "selected_roundtrip_bundle_exact_match"
+                                          ? "Tarif aller-retour confirmé pour ce voyage."
                                           : bestSeat.source ===
-                                              "selected_roundtrip_bundle_exact_match"
-                                            ? "Forfait AR"
-                                            : "À partir de"}
-                                      </p>
-                                    ) : null}
-                                    <p
-                                      className={`mt-2 font-extrabold ${
-                                        bestSeat.source ===
-                                        "neutral_round_trip_quote"
-                                          ? "text-[1.2rem] leading-snug"
-                                          : "text-[2.1rem] leading-tight"
-                                      }`}
-                                    >
-                                      {bestSeat.total}
+                                              "neutral_round_trip_quote"
+                                            ? ROUND_TRIP_CARD_NEUTRAL_PRICE_LABEL
+                                            : `Tarif disponible pour cette traversée • ${duration}`}
                                     </p>
+                                  </div>
+
+                                  <div className="flex justify-end">
+                                    <span className="inline-flex min-h-[3.65rem] shrink-0 items-center justify-center rounded-[14px] bg-[#FFC928] px-5 text-sm font-extrabold uppercase tracking-[0.06em] text-[#163B6D] shadow-[0_10px_24px_rgba(255,201,40,0.26)]">
+                                      {seatSelected ? "Sélectionné" : "Sélectionner"}
+                                    </span>
                                   </div>
                                 </div>
                               </button>
@@ -3063,112 +3413,38 @@ function ResultatsPageContent() {
                                 onClick={() =>
                                   handleSelectChoice(direction, salida, bestCabin.service)
                                 }
-                                className={`rounded-[24px] border px-5 py-5 text-left transition ${
+                                className={`rounded-[26px] border px-6 py-5 text-left text-white shadow-[0_14px_30px_rgba(16,45,84,0.18)] transition hover:-translate-y-px ${
                                   cabinSelected
-                                    ? "border-[#F28C28] bg-[#F28C28] text-white"
-                                    : "border-slate-300 bg-white hover:bg-slate-50"
+                                    ? "border-[#F7C948] bg-[#163B6D] ring-2 ring-[#F7C948]"
+                                    : "border-[#163B6D] bg-[#163B6D] hover:bg-[#1B447A]"
                                 }`}
                               >
-                                <div className="flex flex-col gap-4 xl:grid xl:grid-cols-[minmax(0,1fr)_18rem] xl:items-center xl:gap-6">
+                                <div className="grid grid-cols-[12rem_minmax(0,1fr)_18rem] items-center gap-6">
                                   <div className="min-w-0">
-                                    <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:gap-8">
-                                      <div className="min-w-[9rem]">
-                                        <p className="text-xs font-bold uppercase tracking-wide opacity-80">
-                                          {getCommercialCTA("cabin")}
-                                        </p>
-                                        <p className="mt-2 text-[1.8rem] font-bold leading-none">
-                                          Cabine
-                                        </p>
-                                      </div>
-
-                                      <div className="min-w-0 flex-1">
-                                        <div
-                                          className={`flex flex-wrap items-center gap-x-4 gap-y-2 text-[1rem] ${
-                                            cabinSelected
-                                              ? "text-white/85"
-                                              : "text-slate-600"
-                                          }`}
-                                        >
-                                          <span>
-                                            Départ {formatApiTime(salida.horaSalida)}
-                                          </span>
-                                          <span className="opacity-50">•</span>
-                                          <span>
-                                            Arrivée {formatApiTime(salida.horaLlegada)}
-                                          </span>
-                                          <span className="opacity-50">•</span>
-                                          <span>Durée {duration}</span>
-                                          <span className="opacity-50">•</span>
-                                          <span>{serviceLabel(bestCabin.service)}</span>
-                                        </div>
-
-                                        {bestCabin.source ===
-                                        "selected_roundtrip_reuse_exact_match" ? (
-                                          <p
-                                            className={`mt-3 text-[1rem] ${
-                                              cabinSelected
-                                                ? "text-white/75"
-                                                : "text-slate-500"
-                                            }`}
-                                          >
-                                            Tarif calculé pour votre dossier
-                                          </p>
-                                        ) : bestCabin.source ===
-                                          "selected_roundtrip_bundle_exact_match" ? (
-                                          <p
-                                            className={`mt-3 text-[1rem] ${
-                                              cabinSelected
-                                                ? "text-white/75"
-                                                : "text-slate-500"
-                                            }`}
-                                          >
-                                            Total aller-retour calculé pour votre voyage.
-                                          </p>
-                                        ) : bestCabin.source ===
-                                          "neutral_round_trip_quote" ? (
-                                          <p
-                                            className={`mt-3 text-[1rem] ${
-                                              cabinSelected
-                                                ? "text-white/75"
-                                                : "text-slate-500"
-                                            }`}
-                                          >
-                                            Montant affiché après choix des deux traversées.
-                                          </p>
-                                        ) : null}
-                                      </div>
-                                    </div>
+                                    <p className="text-[1.35rem] font-bold leading-none text-white">
+                                        Cabine
+                                      </p>
                                   </div>
 
-                                  <div
-                                    className={`rounded-[22px] px-5 py-4 xl:text-right ${
-                                      cabinSelected
-                                        ? "bg-white/10 ring-1 ring-white/20"
-                                        : "bg-white ring-1 ring-slate-300"
-                                    }`}
-                                  >
-                                    {bestCabin.source !==
-                                    "neutral_round_trip_quote" ? (
-                                      <p className="text-xs font-semibold uppercase tracking-wide opacity-75">
-                                        {bestCabin.source ===
-                                        "selected_roundtrip_reuse_exact_match"
-                                          ? "Tarif dossier"
+                                  <div className="text-sm leading-relaxed text-white/85">
+                                    <p>
+                                      {bestCabin.source ===
+                                      "selected_roundtrip_reuse_exact_match"
+                                        ? "Tarif confirmé pour votre dossier."
+                                        : bestCabin.source ===
+                                            "selected_roundtrip_bundle_exact_match"
+                                          ? "Tarif aller-retour confirmé pour ce voyage."
                                           : bestCabin.source ===
-                                              "selected_roundtrip_bundle_exact_match"
-                                            ? "Forfait AR"
-                                            : "À partir de"}
-                                      </p>
-                                    ) : null}
-                                    <p
-                                      className={`mt-2 font-extrabold ${
-                                        bestCabin.source ===
-                                        "neutral_round_trip_quote"
-                                          ? "text-[1.2rem] leading-snug"
-                                          : "text-[2.1rem] leading-tight"
-                                      }`}
-                                    >
-                                      {bestCabin.total}
+                                              "neutral_round_trip_quote"
+                                            ? ROUND_TRIP_CARD_NEUTRAL_PRICE_LABEL
+                                            : `Tarif disponible pour cette traversée • ${duration}`}
                                     </p>
+                                  </div>
+
+                                  <div className="flex justify-end">
+                                    <span className="inline-flex min-h-[3.65rem] shrink-0 items-center justify-center rounded-[14px] bg-[#FFC928] px-5 text-sm font-extrabold uppercase tracking-[0.06em] text-[#163B6D] shadow-[0_10px_24px_rgba(255,201,40,0.26)]">
+                                      {cabinSelected ? "Sélectionné" : "Sélectionner"}
+                                    </span>
                                   </div>
                                 </div>
                               </button>
@@ -3243,6 +3519,9 @@ function ResultatsPageContent() {
                           </span>
                         )
                       ) : null}
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </article>
               );
