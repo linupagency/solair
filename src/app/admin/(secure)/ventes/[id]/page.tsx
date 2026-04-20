@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getAdminSaleById } from "@/lib/admin-sales";
+import { AdminRetryArmasPaymentButton } from "@/components/admin/admin-retry-armas-payment-button";
 
 export const dynamic = "force-dynamic";
 
@@ -479,6 +480,16 @@ export default async function AdminSaleDetailPage({
                   ) : null}
                 </div>
               )}
+
+              {sale.status === "draft" &&
+              sale.codigoLocata &&
+              (sale.paymentStatus === "reservation_pending" ||
+                sale.paymentStatus === "captured") ? (
+                <AdminRetryArmasPaymentButton
+                  draftId={sale.id}
+                  codigoLocata={sale.codigoLocata}
+                />
+              ) : null}
             </div>
           </SectionCard>
 

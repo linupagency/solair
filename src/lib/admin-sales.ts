@@ -228,7 +228,11 @@ function computeStats(sales: AdminSale[]): AdminSalesStats {
     const amount = sale.totalAmount || 0;
     const routeKey = `${sale.origen} -> ${sale.destino}`;
 
-    if (sale.status === "draft" && sale.paymentStatus === "captured") {
+    if (
+      sale.status === "draft" &&
+      (sale.paymentStatus === "captured" ||
+        sale.paymentStatus === "reservation_pending")
+    ) {
       totalCapturedPendingReservation += 1;
     }
 

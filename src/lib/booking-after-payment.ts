@@ -5,6 +5,8 @@ import {
   getBookingDraft,
   markBookingDraftReserved,
   patchBookingDraftReservation,
+  type BookingDraft,
+  type BookingDraftPayload,
   type BookingDraftTraveler,
   type BookingDraftVehicleData,
 } from "@/lib/booking-draft-store";
@@ -71,6 +73,10 @@ type FinalizeBookingAfterPaymentInput = {
   capturedAmount?: string;
 };
 
+type RetryBookingPaymentFinalizationInput = {
+  draftId: string;
+};
+
 function normalizeString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
@@ -124,6 +130,138 @@ function normalizeVehicleData(
     modele: normalizeString(vehicleData.modele),
     immatriculation: normalizeString(vehicleData.immatriculation),
     conducteurIndex: Number(vehicleData.conducteurIndex || 0),
+  };
+}
+
+function buildTravelersForEmail(payload: BookingDraftPayload) {
+  return payload.passengersData && payload.passengersData.length > 0
+    ? payload.passengersData
+    : [
+        {
+          nombre: payload.nombre,
+          apellido1: payload.apellido1,
+          apellido2: payload.apellido2 || "",
+          fechaNacimiento: payload.fechaNacimiento,
+          codigoPais: payload.codigoPais,
+          sexo: payload.sexo,
+          tipoDocumento: payload.tipoDocumento,
+          codigoDocumento: payload.codigoDocumento,
+        },
+      ];
+}
+
+function buildInboundLegForEmail(
+  payload: BookingDraftPayload,
+  codigoLocata: string
+) {
+  return payload.tripType === "round_trip" && payload.inboundSelectedDeparture
+    ? {
+        codigoLocata,
+        origen: payload.inboundSelectedDeparture.origen,
+        destino: payload.inboundSelectedDeparture.destino,
+        fechaSalida: payload.inboundSelectedDeparture.fechaSalida,
+        horaSalida: payload.inboundSelectedDeparture.horaSalida,
+      }
+    : undefined;
+}
+
+async function persistArmasReservationPendingState(params: {
+  draftId: string;
+  codigoLocata: string;
+  total?: string;
+  fechaValidezReserva?: string;
+  businessCode?: string;
+  paymentLastError: string;
+}) {
+  await patchBookingDraftReservation(params.draftId, {
+    codigoLocata: params.codigoLocata,
+    ...(params.total ? { total: params.total } : {}),
+    ...(params.fechaValidezReserva
+      ? { fechaValidezReserva: params.fechaValidezReserva }
+      : {}),
+    ...(params.businessCode ? { businessCode: params.businessCode } : {}),
+    paymentStatus: "reservation_pending",
+    paymentUpdatedAt: new Date().toISOString(),
+    paymentLastError: params.paymentLastError,
+    emailStatus: "pending",
+    emailError: "",
+  });
+}
+
+async function finalizeDraftAfterConfirmedArmasPayment(params: {
+  draftId: string;
+  draft: BookingDraft;
+  codigoLocata: string;
+  total: string;
+  fechaValidezReserva?: string;
+  businessCode: string;
+}) {
+  const updatedDraft = await markBookingDraftReserved(params.draftId, {
+    ...(params.draft.reservation || {}),
+    codigoLocata: params.codigoLocata,
+    total: params.total,
+    fechaValidezReserva: params.fechaValidezReserva,
+    businessCode: params.businessCode,
+    paymentStatus: "reserved",
+    paymentUpdatedAt: new Date().toISOString(),
+    emailStatus:
+      params.draft.reservation?.emailStatus === "sent" ? "sent" : "pending",
+    emailError: "",
+  });
+
+  let emailSent = params.draft.reservation?.emailStatus === "sent";
+  let emailError: string | null = null;
+
+  if (!emailSent) {
+    try {
+      const payload = params.draft.payload;
+      const travelersForEmail = buildTravelersForEmail(payload);
+      const inboundLeg = buildInboundLegForEmail(payload, params.codigoLocata);
+
+      await sendBookingConfirmationEmail({
+        to: payload.mail,
+        codigoLocata: params.codigoLocata,
+        total: params.total,
+        origen: payload.origen,
+        destino: payload.destino,
+        fechaSalida: payload.fechaSalida,
+        horaSalida: payload.horaSalida,
+        travelers: travelersForEmail,
+        inboundLeg,
+      });
+
+      await sendBookingConfirmationEmail({
+        to: "reservations@solair-voyages.com",
+        codigoLocata: params.codigoLocata,
+        total: params.total,
+        origen: payload.origen,
+        destino: payload.destino,
+        fechaSalida: payload.fechaSalida,
+        horaSalida: payload.horaSalida,
+        travelers: travelersForEmail,
+        inboundLeg,
+      });
+
+      emailSent = true;
+      await patchBookingDraftReservation(params.draftId, {
+        emailStatus: "sent",
+        emailSentAt: new Date().toISOString(),
+        emailError: "",
+      });
+    } catch (err) {
+      emailError =
+        err instanceof Error ? err.message : "Erreur inconnue d’envoi email.";
+      await patchBookingDraftReservation(params.draftId, {
+        emailStatus: "failed",
+        emailError,
+      });
+    }
+  }
+
+  return {
+    updatedDraft,
+    emailSent,
+    emailError,
   };
 }
 
@@ -427,10 +565,21 @@ export async function finalizeBookingAfterPayment({
       outboundReservation?.precioEntidad?.total
     );
     const totalFromReservations = outboundReservationTotal;
+    const fechaValidezReserva = normalizeString(
+      outboundReservation?.fechaValidezReserva
+    );
+    const reservationTotalDisplay =
+      totalFromReservations !== null && totalFromReservations > 0
+        ? totalFromReservations.toFixed(2)
+        : normalizeString(payload.total);
+
     if (totalFromReservations === null || totalFromReservations <= 0) {
-      await patchBookingDraftReservation(draftId, {
-        paymentStatus: "captured",
-        paymentUpdatedAt: new Date().toISOString(),
+      await persistArmasReservationPendingState({
+        draftId,
+        codigoLocata,
+        total: reservationTotalDisplay,
+        fechaValidezReserva,
+        businessCode: outboundCode || undefined,
         paymentLastError:
           "Réservation créée, mais montant réservation Armas indisponible pour finaliser le paiement.",
       });
@@ -460,9 +609,12 @@ export async function finalizeBookingAfterPayment({
         };
       }
       if (Math.abs(captured - totalFromReservations) > 0.01) {
-        await patchBookingDraftReservation(draftId, {
-          paymentStatus: "captured",
-          paymentUpdatedAt: new Date().toISOString(),
+        await persistArmasReservationPendingState({
+          draftId,
+          codigoLocata,
+          total: reservationTotalDisplay,
+          fechaValidezReserva,
+          businessCode: outboundCode || undefined,
           paymentLastError:
             "Montant capturé PayPal différent du montant réservation Armas.",
         });
@@ -490,9 +642,12 @@ export async function finalizeBookingAfterPayment({
     const paymentCode = normalizeString(paymentResult?.return?.codigo);
     const paymentText = normalizeString(paymentResult?.return?.texto);
     if (!isBusinessSuccess(paymentCode)) {
-      await patchBookingDraftReservation(draftId, {
-        paymentStatus: "captured",
-        paymentUpdatedAt: new Date().toISOString(),
+      await persistArmasReservationPendingState({
+        draftId,
+        codigoLocata,
+        total: reservationTotalDisplay,
+        fechaValidezReserva,
+        businessCode: paymentCode || outboundCode || undefined,
         paymentLastError:
           "Réservation créée mais finalisation nasaPagos non confirmée.",
       });
@@ -520,9 +675,12 @@ export async function finalizeBookingAfterPayment({
       pagoImporte === null ||
       Math.abs(pagoImporte - totalFromReservations) > 0.01
     ) {
-      await patchBookingDraftReservation(draftId, {
-        paymentStatus: "captured",
-        paymentUpdatedAt: new Date().toISOString(),
+      await persistArmasReservationPendingState({
+        draftId,
+        codigoLocata,
+        total: reservationTotalDisplay,
+        fechaValidezReserva,
+        businessCode: paymentCode || outboundCode || undefined,
         paymentLastError:
           "nasaPagos confirmé, mais le montant renvoyé n’est pas réconciliable avec la réservation.",
       });
@@ -547,90 +705,15 @@ export async function finalizeBookingAfterPayment({
         ? totalFromReservations.toFixed(2)
         : payload.total || ""
     );
-    const fechaValidezReserva = normalizeString(
-      outboundReservation?.fechaValidezReserva
-    );
-
-    const updatedDraft = await markBookingDraftReserved(draftId, {
-      codigoLocata,
-      total,
-      fechaValidezReserva,
-      businessCode: paymentCode || outboundCode,
-      paymentStatus: "reserved",
-      paymentUpdatedAt: new Date().toISOString(),
-      emailStatus: "pending",
-      emailError: "",
-    });
-
-    let emailSent = false;
-    let emailError: string | null = null;
-
-    try {
-      const travelersForEmail =
-        payload.passengersData && payload.passengersData.length > 0
-          ? payload.passengersData
-          : [
-              {
-                nombre: payload.nombre,
-                apellido1: payload.apellido1,
-                apellido2: payload.apellido2 || "",
-                fechaNacimiento: payload.fechaNacimiento,
-                codigoPais: payload.codigoPais,
-                sexo: payload.sexo,
-                tipoDocumento: payload.tipoDocumento,
-                codigoDocumento: payload.codigoDocumento,
-              },
-            ];
-
-      const inboundLeg =
-        payload.tripType === "round_trip" && payload.inboundSelectedDeparture
-          ? {
-              codigoLocata,
-              origen: payload.inboundSelectedDeparture.origen,
-              destino: payload.inboundSelectedDeparture.destino,
-              fechaSalida: payload.inboundSelectedDeparture.fechaSalida,
-              horaSalida: payload.inboundSelectedDeparture.horaSalida,
-            }
-          : undefined;
-
-      await sendBookingConfirmationEmail({
-        to: payload.mail,
+    const { updatedDraft, emailSent, emailError } =
+      await finalizeDraftAfterConfirmedArmasPayment({
+        draftId,
+        draft,
         codigoLocata,
         total,
-        origen: payload.origen,
-        destino: payload.destino,
-        fechaSalida: payload.fechaSalida,
-        horaSalida: payload.horaSalida,
-        travelers: travelersForEmail,
-        inboundLeg,
+        fechaValidezReserva,
+        businessCode: paymentCode || outboundCode,
       });
-
-      await sendBookingConfirmationEmail({
-        to: "reservations@solair-voyages.com",
-        codigoLocata,
-        total,
-        origen: payload.origen,
-        destino: payload.destino,
-        fechaSalida: payload.fechaSalida,
-        horaSalida: payload.horaSalida,
-        travelers: travelersForEmail,
-        inboundLeg,
-      });
-
-      emailSent = true;
-      await patchBookingDraftReservation(draftId, {
-        emailStatus: "sent",
-        emailSentAt: new Date().toISOString(),
-        emailError: "",
-      });
-    } catch (err) {
-      emailError =
-        err instanceof Error ? err.message : "Erreur inconnue d’envoi email.";
-      await patchBookingDraftReservation(draftId, {
-        emailStatus: "failed",
-        emailError,
-      });
-    }
 
     return {
       ok: true,
@@ -672,4 +755,173 @@ export async function finalizeBookingAfterPayment({
       },
     };
   }
+}
+
+export async function retryBookingPaymentFinalization({
+  draftId,
+}: RetryBookingPaymentFinalizationInput) {
+  const validation = validateArmasBasicConfig();
+
+  if (!validation.isValid) {
+    return {
+      ok: false,
+      status: 500,
+      body: {
+        ok: false,
+        message: "Configuration Armas incomplete.",
+        missingEnv: validation.missing,
+      },
+    };
+  }
+
+  const draft = await getBookingDraft(draftId);
+
+  if (!draft) {
+    return {
+      ok: false,
+      status: 404,
+      body: {
+        ok: false,
+        message: "Draft introuvable.",
+      },
+    };
+  }
+
+  if (draft.status === "reserved" && draft.reservation?.codigoLocata) {
+    return {
+      ok: true,
+      status: 200,
+      body: {
+        ok: true,
+        message: "Réservation déjà finalisée.",
+        alreadyReserved: true,
+        reservation: draft.reservation,
+      },
+    };
+  }
+
+  const codigoLocata = normalizeString(draft.reservation?.codigoLocata);
+  if (!codigoLocata) {
+    return {
+      ok: false,
+      status: 409,
+      body: {
+        ok: false,
+        message:
+          "Aucune référence Armas enregistrée sur ce dossier. Impossible de relancer nasaPagos sans risquer un doublon.",
+      },
+    };
+  }
+
+  const reservationAmount =
+    toNumberOrNull(draft.reservation?.total) ??
+    toNumberOrNull(draft.payload.total) ??
+    toNumberOrNull(draft.reservation?.paypalAmount);
+
+  if (reservationAmount === null || reservationAmount <= 0) {
+    return {
+      ok: false,
+      status: 409,
+      body: {
+        ok: false,
+        message:
+          "Montant introuvable pour relancer nasaPagos sur cette réservation existante.",
+        codigoLocata,
+      },
+    };
+  }
+
+  const paymentResult = (await nasaPagosRequest({
+    codigoLocata,
+    importe: reservationAmount,
+    codigoFormaPago: "CRE",
+  })) as PagoResponse;
+
+  const paymentCode = normalizeString(paymentResult?.return?.codigo);
+  const paymentText = normalizeString(paymentResult?.return?.texto);
+  const total = reservationAmount.toFixed(2);
+
+  if (!isBusinessSuccess(paymentCode)) {
+    await persistArmasReservationPendingState({
+      draftId,
+      codigoLocata,
+      total,
+      fechaValidezReserva: normalizeString(draft.reservation?.fechaValidezReserva),
+      businessCode:
+        paymentCode || normalizeString(draft.reservation?.businessCode) || undefined,
+      paymentLastError:
+        "Relance nasaPagos non confirmée par Armas. Le dossier reste à contrôler.",
+    });
+
+    return {
+      ok: false,
+      status: 409,
+      body: {
+        ok: false,
+        message: "Relance nasaPagos non confirmée par Armas.",
+        draftId,
+        codigoLocata,
+        businessCode: paymentCode || null,
+        businessText: paymentText || null,
+        data: { payment: paymentResult },
+      },
+    };
+  }
+
+  const paid = getFirstPago(paymentResult);
+  const pagoImporte = toNumberOrNull(
+    paid?.formasPagosEntidad?.formaPagoEntidad?.importe
+  );
+
+  if (pagoImporte === null || Math.abs(pagoImporte - reservationAmount) > 0.01) {
+    await persistArmasReservationPendingState({
+      draftId,
+      codigoLocata,
+      total,
+      fechaValidezReserva: normalizeString(draft.reservation?.fechaValidezReserva),
+      businessCode: paymentCode || normalizeString(draft.reservation?.businessCode) || undefined,
+      paymentLastError:
+        "Relance nasaPagos confirmée, mais le montant renvoyé n’est pas réconciliable avec le dossier.",
+    });
+
+    return {
+      ok: false,
+      status: 409,
+      body: {
+        ok: false,
+        message:
+          "Relance nasaPagos confirmée, mais le montant renvoyé n’est pas réconciliable avec le dossier.",
+        draftId,
+        codigoLocata,
+        paymentAmount: pagoImporte,
+        reservationAmount,
+        data: { payment: paymentResult },
+      },
+    };
+  }
+
+  const { updatedDraft, emailSent, emailError } =
+    await finalizeDraftAfterConfirmedArmasPayment({
+      draftId,
+      draft,
+      codigoLocata,
+      total,
+      fechaValidezReserva: normalizeString(draft.reservation?.fechaValidezReserva),
+      businessCode: paymentCode || normalizeString(draft.reservation?.businessCode),
+    });
+
+  return {
+    ok: true,
+    status: 200,
+    body: {
+      ok: true,
+      message: "Relance nasaPagos confirmée. Le dossier est maintenant finalisé.",
+      draftId,
+      codigoLocata,
+      reservation: updatedDraft?.reservation || draft.reservation,
+      emailSent,
+      emailError,
+      data: { payment: paymentResult },
+    },
+  };
 }
