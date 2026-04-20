@@ -19,27 +19,6 @@ import {
 } from "@/lib/booking-flow";
 import { getCommercialLabel } from "@/lib/ui/armas-commercial";
 
-type DocumentType = {
-  tipoDocumento?: string;
-  textoCorto?: string;
-  textoLargo?: string;
-};
-
-type DocumentTypesResponse = {
-  tiposDocumentosEntidad?: {
-    tipoDocumentoEntidad?: DocumentType[] | DocumentType;
-  };
-};
-
-type ApiEnvelope<T> = {
-  ok: boolean;
-  message?: string;
-  error?: string;
-  data?: {
-    return?: T;
-  };
-};
-
 type TravelerForm = {
   nombre: string;
   apellido1: string;
@@ -100,6 +79,8 @@ function normalizeArray<T>(value?: T[] | T): T[] {
   if (!value) return [];
   return Array.isArray(value) ? value : [value];
 }
+
+const PASSPORT_DOCUMENT_CODE = "P";
 
 function formatApiDate(value?: string) {
   if (!value || value.length !== 8) return value || "-";
@@ -263,7 +244,7 @@ function dateIsoToApi(value: string) {
   return "";
 }
 
-function createEmptyTraveler(defaultDocument = "P"): TravelerForm {
+function createEmptyTraveler(defaultDocument = PASSPORT_DOCUMENT_CODE): TravelerForm {
   return {
     nombre: "",
     apellido1: "",
@@ -317,7 +298,7 @@ function buildTravelersFromFlow(
         specialAssistance: existing.specialAssistance || "",
         codigoPais: existing.codigoPais || "FR",
         sexo: existing.sexo || "H",
-        tipoDocumento: existing.tipoDocumento || defaultDocument,
+        tipoDocumento: defaultDocument,
         codigoDocumento: existing.codigoDocumento || "",
       };
     }
@@ -447,8 +428,6 @@ export default function PassagersPage() {
   const [flow, setFlowState] = useState<BookingFlow | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-
-  const [documentTypes, setDocumentTypes] = useState<DocumentType[]>([]);
   const [travelers, setTravelers] = useState<TravelerForm[]>([]);
   const [vehicles, setVehicles] = useState<VehicleForm[]>([]);
   const [mail, setMail] = useState("");
@@ -473,36 +452,9 @@ export default function PassagersPage() {
         setLoading(true);
         setError("");
         setFlowState(currentFlow);
-
-        const response = await fetch(
-          `/api/armas/test-document-types?origen=${encodeURIComponent(
-            currentFlow.search.origen
-          )}&destino=${encodeURIComponent(currentFlow.search.destino)}`,
-          { cache: "no-store" }
+        setTravelers(
+          buildTravelersFromFlow(currentFlow, PASSPORT_DOCUMENT_CODE)
         );
-
-        const json: ApiEnvelope<DocumentTypesResponse> = await response.json();
-
-        if (!response.ok || !json.ok) {
-          throw new Error(
-            json.error ||
-              json.message ||
-              "Impossible de charger les types de documents."
-          );
-        }
-
-        const docs = normalizeArray(
-          json.data?.return?.tiposDocumentosEntidad?.tipoDocumentoEntidad
-        );
-
-        setDocumentTypes(docs);
-
-        const defaultDocument =
-          docs.find((item) => item.tipoDocumento === "P")?.tipoDocumento ||
-          docs[0]?.tipoDocumento ||
-          "P";
-
-        setTravelers(buildTravelersFromFlow(currentFlow, defaultDocument));
         setVehicles(buildVehicleInstances(currentFlow.search.vehicles));
         setMail(currentFlow.contact.mail || "");
         setTelefono(currentFlow.contact.telefono || "");
@@ -602,13 +554,13 @@ export default function PassagersPage() {
       (traveler, index) => ({
         nombre: traveler.nombre.trim(),
         apellido1: traveler.apellido1.trim(),
-        apellido2: traveler.apellido2.trim(),
+        apellido2: "",
         fechaNacimiento: birthDateToApi(traveler.fechaNacimiento),
         documentValidUntil: dateIsoToApi(traveler.documentValidUntil),
         specialAssistance: traveler.specialAssistance.trim(),
         codigoPais: traveler.codigoPais.trim(),
         sexo: traveler.sexo,
-        tipoDocumento: traveler.tipoDocumento,
+        tipoDocumento: PASSPORT_DOCUMENT_CODE,
         codigoDocumento: traveler.codigoDocumento.trim(),
         tipoPasajero: getTipoPasajeroForPassengerIndex(
           flow.search.passengers,
@@ -852,8 +804,8 @@ export default function PassagersPage() {
                       </Field>
 
                       <Field
-                        label="Premier nom"
-                        hint="Premier prenom tel qu'il apparait sur le document."
+                        label="Prénom"
+                        hint="Prenom tel qu'il apparait sur le document."
                       >
                         <InputBase
                           autoComplete="off"
@@ -871,43 +823,8 @@ export default function PassagersPage() {
                         />
                       </Field>
 
-                      <Field
-                        label="Deuxieme nom / second prenom"
-                        hint="Facultatif."
-                      >
-                        <InputBase
-                          autoComplete="off"
-                          spellCheck={false}
-                          value={traveler.apellido2}
-                          onChange={(e) =>
-                            updateTraveler(
-                              index,
-                              "apellido2",
-                              e.target.value.toUpperCase()
-                            )
-                          }
-                          placeholder="Optionnel"
-                        />
-                      </Field>
-
                       <Field label="Type de document">
-                        <SelectBase
-                          value={traveler.tipoDocumento}
-                          onChange={(e) =>
-                            updateTraveler(index, "tipoDocumento", e.target.value)
-                          }
-                          hasError={submitted && !!errors?.tipoDocumento}
-                        >
-                          {documentTypes.map((item, docIndex) => (
-                            <option
-                              key={`${item.tipoDocumento || "DOC"}-${docIndex}`}
-                              value={item.tipoDocumento || ""}
-                            >
-                              {item.textoCorto || item.tipoDocumento || "Document"} (
-                              {item.tipoDocumento || "-"})
-                            </option>
-                          ))}
-                        </SelectBase>
+                        <InputBase value="Passeport" readOnly />
                       </Field>
 
                       <Field
