@@ -34,6 +34,30 @@ export type PayPalOrderLikeResponse = {
   [key: string]: unknown;
 };
 
+export type PayPalCaptureSummary = {
+  captureID: string | null;
+  captureStatus: string | null;
+  amount: string | null;
+  currency: string | null;
+};
+
+export type CapturePayPalOrderSuccess = PayPalCaptureSummary & {
+  ok: true;
+  alreadyCaptured: boolean;
+  orderStatus: string | null;
+  data: PayPalOrderLikeResponse;
+};
+
+export type CapturePayPalOrderFailure = {
+  ok: false;
+  paypalStatus: number;
+  paypalResponse: PayPalErrorResponse | PayPalOrderLikeResponse;
+};
+
+export type CapturePayPalOrderResult =
+  | CapturePayPalOrderSuccess
+  | CapturePayPalOrderFailure;
+
 type VerifyWebhookHeaders = {
   authAlgo: string;
   certUrl: string;
@@ -97,11 +121,12 @@ export async function getPayPalAccessToken() {
     !("access_token" in data) ||
     typeof data.access_token !== "string"
   ) {
+    const errorData = data as PayPalErrorResponse;
     const detail =
-      typeof data.error_description === "string"
-        ? data.error_description
-        : typeof data.error === "string"
-          ? data.error
+      typeof errorData.error_description === "string"
+        ? errorData.error_description
+        : typeof errorData.error === "string"
+          ? errorData.error
           : rawText || "Réponse inconnue PayPal.";
 
     throw new Error(
@@ -112,7 +137,9 @@ export async function getPayPalAccessToken() {
   return data.access_token;
 }
 
-export function getCaptureSummary(data: PayPalOrderLikeResponse) {
+export function getCaptureSummary(
+  data: PayPalOrderLikeResponse
+): PayPalCaptureSummary {
   const capture = data.purchase_units?.[0]?.payments?.captures?.[0];
 
   return {
@@ -163,7 +190,9 @@ export async function getPayPalOrderDetails(
   };
 }
 
-export async function capturePayPalOrder(orderID: string) {
+export async function capturePayPalOrder(
+  orderID: string
+): Promise<CapturePayPalOrderResult> {
   const accessToken = await getPayPalAccessToken();
 
   const existingOrder = await getPayPalOrderDetails(accessToken, orderID);
@@ -221,8 +250,16 @@ export async function capturePayPalOrder(orderID: string) {
   const successData = data as PayPalOrderLikeResponse;
   const paid = isPaidState(successData);
 
+  if (!paid) {
+    return {
+      ok: false,
+      paypalStatus: response.status,
+      paypalResponse: successData,
+    };
+  }
+
   return {
-    ok: paid,
+    ok: true,
     alreadyCaptured: false,
     orderStatus: successData.status || null,
     ...getCaptureSummary(successData),
