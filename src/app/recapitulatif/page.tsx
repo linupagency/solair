@@ -335,19 +335,13 @@ function SectionCard({
   title,
   subtitle,
   children,
-  variant = "panel",
 }: {
   title: string;
   subtitle?: string;
   children: ReactNode;
-  variant?: "panel" | "plain";
 }) {
   return (
-    <section
-      className={
-        variant === "panel" ? "solair-panel p-5 sm:p-6" : "px-1 py-1"
-      }
-    >
+    <section className="solair-panel p-5 sm:p-6">
       <div className="mb-5">
         <h2 className="text-xl font-bold text-slate-900">{title}</h2>
         {subtitle ? <p className="mt-1 text-sm text-slate-500">{subtitle}</p> : null}
@@ -1299,9 +1293,8 @@ export default function RecapitulatifPage() {
           <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
             <div className="space-y-6">
               <SectionCard
-                title="Traversée"
-                subtitle="Résumé des segments sélectionnés."
-                variant="plain"
+                title="Votre voyage sélectionné"
+                subtitle="Retrouvez ici le résumé de votre traversée."
               >
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="rounded-2xl bg-[#F3F6F7] p-4">
@@ -1349,7 +1342,6 @@ export default function RecapitulatifPage() {
               <SectionCard
                 title="Voyageurs"
                 subtitle="Identités utilisées pour la réservation."
-                variant="plain"
               >
                 <div className="space-y-4">
                   {bookingFlow.travelers.map((traveler, index) => {
@@ -1409,7 +1401,6 @@ export default function RecapitulatifPage() {
                 <SectionCard
                   title="Véhicules"
                   subtitle="Informations associées au dossier."
-                  variant="plain"
                 >
                   <div className="space-y-4">
                     {bookingFlow.search.vehicles.map((vehicle, index) => (
@@ -1463,7 +1454,6 @@ export default function RecapitulatifPage() {
               <SectionCard
                 title="Contact principal"
                 subtitle="Coordonnées utilisées pour le suivi."
-                variant="plain"
               >
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="rounded-2xl bg-[#F3F6F7] p-4">
@@ -1489,10 +1479,44 @@ export default function RecapitulatifPage() {
 
             <aside className="space-y-6">
               <SectionCard
-                title="Prix"
-                subtitle="Recalculé avant paiement."
+                title="Avant de continuer"
+                subtitle="Vérifiez les informations essentielles avant paiement."
               >
                 <div className="space-y-4">
+                  <div className="rounded-2xl bg-[#F4FAFF] p-4 ring-1 ring-[#CDE4F7]">
+                    <p className="text-sm font-semibold text-[#1F2F46]">
+                      Dossier
+                    </p>
+                    <p className="mt-2 text-sm text-slate-600">
+                      {bookingFlow.tripType === "round_trip"
+                        ? "Aller-retour"
+                        : "Aller simple"}{" "}
+                      •{" "}
+                      {discountLabel(
+                        bookingFlow.search.bonificacion,
+                        outboundPricing.bonificationLabel ||
+                          bookingFlow.search.bonificacionLabel
+                      )}
+                    </p>
+                    <p className="mt-1 text-sm text-slate-600">
+                      {bookingFlow.search.animals.enabled &&
+                      bookingFlow.search.animals.count > 0
+                        ? `${bookingFlow.search.animals.count} animal${
+                            bookingFlow.search.animals.count > 1 ? "s" : ""
+                          }`
+                        : "Sans animal"}
+                    </p>
+                  </div>
+
+                  <div className="rounded-2xl bg-[#F3F6F7] p-4">
+                    <p className="text-sm font-semibold text-slate-700">
+                      Prix
+                    </p>
+                    <p className="mt-2 text-sm text-slate-600">
+                      Recalculé avant paiement à partir du dossier final.
+                    </p>
+                  </div>
+
                   {outboundPricing.status === "loading" && (
                     <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
                       Recalcul du prix en cours...

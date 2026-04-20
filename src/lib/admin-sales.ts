@@ -31,6 +31,19 @@ export type AdminSale = {
   totalAmount: number | null;
   totalDisplay: string;
   businessCode: string;
+  paymentStatus: string;
+  paypalOrderId: string;
+  paypalCaptureId: string;
+  paypalAmount: string;
+  paypalCurrency: string;
+  paypalOrderStatus: string;
+  paypalCaptureStatus: string;
+  paymentUpdatedAt: string;
+  paymentCapturedAt: string;
+  paymentLastError: string;
+  emailStatus: string;
+  emailSentAt: string;
+  emailError: string;
   tripType: "one_way" | "round_trip";
   origen: string;
   destino: string;
@@ -49,6 +62,8 @@ export type AdminSale = {
 export type AdminSalesStats = {
   totalReservedSales: number;
   totalDraftSales: number;
+  totalCapturedPendingReservation: number;
+  totalFailedPayments: number;
   revenueToday: number;
   revenueMonth: number;
   averageBasket: number;
@@ -139,6 +154,19 @@ function mapRowToAdminSale(row: BookingDraftRow): AdminSale {
     totalAmount,
     totalDisplay: normalizeString(row.reservation?.total || row.payload.total),
     businessCode: normalizeString(row.reservation?.businessCode),
+    paymentStatus: normalizeString(row.reservation?.paymentStatus),
+    paypalOrderId: normalizeString(row.reservation?.paypalOrderId),
+    paypalCaptureId: normalizeString(row.reservation?.paypalCaptureId),
+    paypalAmount: normalizeString(row.reservation?.paypalAmount),
+    paypalCurrency: normalizeString(row.reservation?.paypalCurrency),
+    paypalOrderStatus: normalizeString(row.reservation?.paypalOrderStatus),
+    paypalCaptureStatus: normalizeString(row.reservation?.paypalCaptureStatus),
+    paymentUpdatedAt: normalizeString(row.reservation?.paymentUpdatedAt),
+    paymentCapturedAt: normalizeString(row.reservation?.paymentCapturedAt),
+    paymentLastError: normalizeString(row.reservation?.paymentLastError),
+    emailStatus: normalizeString(row.reservation?.emailStatus),
+    emailSentAt: normalizeString(row.reservation?.emailSentAt),
+    emailError: normalizeString(row.reservation?.emailError),
     tripType:
       row.payload.tripType === "round_trip" || normalizeString(row.payload.fechaVuelta)
         ? "round_trip"
@@ -187,6 +215,8 @@ function computeStats(sales: AdminSale[]): AdminSalesStats {
 
   let totalReservedSales = 0;
   let totalDraftSales = 0;
+  let totalCapturedPendingReservation = 0;
+  let totalFailedPayments = 0;
   let revenueToday = 0;
   let revenueMonth = 0;
   let reservedRevenue = 0;
@@ -197,6 +227,14 @@ function computeStats(sales: AdminSale[]): AdminSalesStats {
     const createdAt = new Date(sale.createdAt);
     const amount = sale.totalAmount || 0;
     const routeKey = `${sale.origen} -> ${sale.destino}`;
+
+    if (sale.status === "draft" && sale.paymentStatus === "captured") {
+      totalCapturedPendingReservation += 1;
+    }
+
+    if (sale.paymentStatus === "failed" || sale.paymentStatus === "denied") {
+      totalFailedPayments += 1;
+    }
 
     if (sale.status === "reserved") {
       totalReservedSales += 1;
@@ -222,6 +260,8 @@ function computeStats(sales: AdminSale[]): AdminSalesStats {
   return {
     totalReservedSales,
     totalDraftSales,
+    totalCapturedPendingReservation,
+    totalFailedPayments,
     revenueToday,
     revenueMonth,
     averageBasket: totalReservedSales > 0 ? reservedRevenue / totalReservedSales : 0,

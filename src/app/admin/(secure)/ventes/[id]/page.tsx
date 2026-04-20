@@ -99,6 +99,47 @@ function statusClasses(status: "draft" | "reserved") {
     : "bg-[#fce9e6] text-[#c94c3d]";
 }
 
+function paymentLabel(status: string) {
+  switch (status) {
+    case "created":
+      return "Paiement créé";
+    case "captured":
+      return "Paiement capturé";
+    case "reservation_pending":
+      return "Finalisation dossier";
+    case "reserved":
+      return "Payé et réservé";
+    case "failed":
+      return "Paiement en échec";
+    case "denied":
+      return "Paiement refusé";
+    case "reversed":
+      return "Paiement annulé";
+    case "test_mode":
+      return "Mode test";
+    default:
+      return "Sans paiement";
+  }
+}
+
+function paymentClasses(status: string) {
+  switch (status) {
+    case "captured":
+    case "reserved":
+      return "bg-[#eef6eb] text-[#3f7f4a]";
+    case "reservation_pending":
+      return "bg-[#fff7e7] text-[#a27018]";
+    case "failed":
+    case "denied":
+    case "reversed":
+      return "bg-[#fce9e6] text-[#c94c3d]";
+    case "created":
+      return "bg-[#f4f1ff] text-[#6d4fd7]";
+    default:
+      return "bg-[#f8f3ec] text-[#6f5e50]";
+  }
+}
+
 function SectionCard({
   title,
   description,
@@ -371,8 +412,8 @@ export default async function AdminSaleDetailPage({
               />
               <InfoBox label="Code métier" value={sale.businessCode || "-"} />
               <div className="rounded-[22px] border border-[#eadfd3] bg-[#fcfaf7] px-4 py-4">
-                <p className="text-sm font-medium text-[#8d7764]">Statut</p>
-                <div className="mt-2">
+                <p className="text-sm font-medium text-[#8d7764]">Statuts</p>
+                <div className="mt-2 flex flex-wrap gap-2">
                   <span
                     className={`inline-flex rounded-full px-3 py-1.5 text-sm font-semibold ${statusClasses(
                       sale.status
@@ -380,8 +421,64 @@ export default async function AdminSaleDetailPage({
                   >
                     {statusLabel(sale.status)}
                   </span>
+                  <span
+                    className={`inline-flex rounded-full px-3 py-1.5 text-sm font-semibold ${paymentClasses(
+                      sale.paymentStatus
+                    )}`}
+                  >
+                    {paymentLabel(sale.paymentStatus)}
+                  </span>
                 </div>
               </div>
+            </div>
+          </SectionCard>
+
+          <SectionCard
+            title="Paiement et notifications"
+            description="Traçabilité PayPal et état des emails envoyés."
+          >
+            <div className="space-y-4">
+              <InfoBox label="Order ID PayPal" value={sale.paypalOrderId || "-"} />
+              <InfoBox label="Capture ID PayPal" value={sale.paypalCaptureId || "-"} />
+              <InfoBox
+                label="Montant PayPal"
+                value={
+                  sale.paypalAmount
+                    ? `${sale.paypalAmount} ${sale.paypalCurrency || "EUR"}`
+                    : "-"
+                }
+              />
+              <InfoBox
+                label="Statut ordre / capture"
+                value={
+                  [sale.paypalOrderStatus, sale.paypalCaptureStatus]
+                    .filter(Boolean)
+                    .join(" / ") || "-"
+                }
+              />
+              <InfoBox
+                label="Emails"
+                value={
+                  sale.emailStatus === "sent"
+                    ? `Envoyés le ${formatDateTime(sale.emailSentAt)}`
+                    : sale.emailStatus === "failed"
+                      ? "Échec d’envoi"
+                      : sale.emailStatus === "pending"
+                        ? "En attente"
+                        : "-"
+                }
+              />
+              {(sale.paymentLastError || sale.emailError) && (
+                <div className="rounded-[22px] border border-[#f3d5cc] bg-[#fff1ed] px-4 py-4 text-sm text-[#9d4b38]">
+                  <p className="font-semibold">Point de vigilance</p>
+                  {sale.paymentLastError ? (
+                    <p className="mt-2">Paiement : {sale.paymentLastError}</p>
+                  ) : null}
+                  {sale.emailError ? (
+                    <p className="mt-2">Emails : {sale.emailError}</p>
+                  ) : null}
+                </div>
+              )}
             </div>
           </SectionCard>
 
@@ -392,6 +489,10 @@ export default async function AdminSaleDetailPage({
             <div className="space-y-4">
               <InfoBox label="Créé le" value={formatDateTime(sale.createdAt)} />
               <InfoBox label="Mis à jour le" value={formatDateTime(sale.updatedAt)} />
+              <InfoBox
+                label="Dernière mise à jour paiement"
+                value={formatDateTime(sale.paymentUpdatedAt)}
+              />
             </div>
           </SectionCard>
         </aside>

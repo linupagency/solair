@@ -66,6 +66,32 @@ type AvailableDatesApiResponse = {
   availableDates?: string[];
 };
 
+async function fetchAvailableDatesWindow(args: {
+  origen: string;
+  destino: string;
+  startDate: string;
+  days: number;
+}) {
+  const response = await fetch(
+    `/api/armas/test-available-dates?origen=${encodeURIComponent(
+      args.origen
+    )}&destino=${encodeURIComponent(
+      args.destino
+    )}&startDate=${args.startDate}&days=${args.days}&concurrency=8`,
+    { cache: "no-store" }
+  );
+
+  const json: AvailableDatesApiResponse = await response.json();
+
+  if (!response.ok || !json.ok) {
+    throw new Error(
+      json.error || json.message || "Impossible de charger les dates disponibles."
+    );
+  }
+
+  return (json.availableDates || []).map(toInputDateFromApi).filter(Boolean);
+}
+
 type DiscountOption = {
   code: string;
   shortLabel: string;
@@ -182,6 +208,7 @@ const HOME_HEADER_TOP_LINKS: HomeHeaderLink[] = [
  */
 const HOME_HERO_BACKGROUND_IMAGE = "/hero-solair-home.jpg";
 const AVAILABLE_DATES_LOOKAHEAD_DAYS = 210;
+const AVAILABLE_DATES_INITIAL_WINDOW_DAYS = 75;
 
 type VehicleTrailerRowKey = Extract<
   VehicleUiRowKey,
@@ -1442,90 +1469,118 @@ export default function HomePage() {
   useEffect(() => {
     let cancelled = false;
 
-    async function loadAvailableDates() {
+    async function loadOutboundDates() {
       if (!origen || !destino) {
         setAvailableOutboundDates([]);
-        setAvailableInboundDates([]);
         return;
       }
 
       const start = toApiDate(getTodayInputDate());
       setLoadingOutboundDates(true);
-      setLoadingInboundDates(tripType === "round_trip");
 
       try {
-        const outboundResponse = await fetch(
-          `/api/armas/test-available-dates?origen=${encodeURIComponent(
-            origen
-          )}&destino=${encodeURIComponent(
-            destino
-          )}&startDate=${start}&days=${AVAILABLE_DATES_LOOKAHEAD_DAYS}&concurrency=8`,
-          { cache: "no-store" }
+        const initialDays = Math.min(
+          AVAILABLE_DATES_INITIAL_WINDOW_DAYS,
+          AVAILABLE_DATES_LOOKAHEAD_DAYS
         );
-        const outboundJson: AvailableDatesApiResponse =
-          await outboundResponse.json();
-        if (!outboundResponse.ok || !outboundJson.ok) {
-          throw new Error(
-            outboundJson.error ||
-              outboundJson.message ||
-              "Impossible de charger les dates aller."
-          );
-        }
-
-        const outbound = (outboundJson.availableDates || [])
-          .map(toInputDateFromApi)
-          .filter(Boolean);
+        const initialDates = await fetchAvailableDatesWindow({
+          origen,
+          destino,
+          startDate: start,
+          days: initialDays,
+        });
 
         if (!cancelled) {
-          setAvailableOutboundDates(outbound);
+          setAvailableOutboundDates(initialDates);
+          setLoadingOutboundDates(false);
         }
 
-        if (tripType === "round_trip") {
-          const inboundResponse = await fetch(
-            `/api/armas/test-available-dates?origen=${encodeURIComponent(
-              destino
-            )}&destino=${encodeURIComponent(
-              origen
-            )}&startDate=${start}&days=${AVAILABLE_DATES_LOOKAHEAD_DAYS}&concurrency=8`,
-            { cache: "no-store" }
-          );
-          const inboundJson: AvailableDatesApiResponse =
-            await inboundResponse.json();
-          if (!inboundResponse.ok || !inboundJson.ok) {
-            throw new Error(
-              inboundJson.error ||
-                inboundJson.message ||
-                "Impossible de charger les dates retour."
-            );
-          }
+        if (AVAILABLE_DATES_LOOKAHEAD_DAYS > initialDays) {
+          const fullDates = await fetchAvailableDatesWindow({
+            origen,
+            destino,
+            startDate: start,
+            days: AVAILABLE_DATES_LOOKAHEAD_DAYS,
+          });
+
           if (!cancelled) {
-            setAvailableInboundDates(
-              (inboundJson.availableDates || [])
-                .map(toInputDateFromApi)
-                .filter(Boolean)
-            );
+            setAvailableOutboundDates(fullDates);
           }
-        } else if (!cancelled) {
-          setAvailableInboundDates([]);
         }
       } catch {
         if (!cancelled) {
           setAvailableOutboundDates([]);
-          setAvailableInboundDates([]);
-        }
-      } finally {
-        if (!cancelled) {
           setLoadingOutboundDates(false);
+        }
+      }
+    }
+
+    loadOutboundDates();
+    return () => {
+      cancelled = true;
+    };
+  }, [origen, destino]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadInboundDates() {
+      if (
+        tripType !== "round_trip" ||
+        !origen ||
+        !destino ||
+        !dateIda
+      ) {
+        setAvailableInboundDates([]);
+        setLoadingInboundDates(false);
+        return;
+      }
+
+      const start = toApiDate(dateIda);
+      setLoadingInboundDates(true);
+
+      try {
+        const initialDays = Math.min(
+          AVAILABLE_DATES_INITIAL_WINDOW_DAYS,
+          AVAILABLE_DATES_LOOKAHEAD_DAYS
+        );
+        const initialDates = await fetchAvailableDatesWindow({
+          origen: destino,
+          destino: origen,
+          startDate: start,
+          days: initialDays,
+        });
+
+        if (!cancelled) {
+          setAvailableInboundDates(initialDates);
+          setLoadingInboundDates(false);
+        }
+
+        if (AVAILABLE_DATES_LOOKAHEAD_DAYS > initialDays) {
+          const fullDates = await fetchAvailableDatesWindow({
+            origen: destino,
+            destino: origen,
+            startDate: start,
+            days: AVAILABLE_DATES_LOOKAHEAD_DAYS,
+          });
+
+          if (!cancelled) {
+            setAvailableInboundDates(fullDates);
+          }
+        }
+      } catch {
+        if (!cancelled) {
+          setAvailableInboundDates([]);
           setLoadingInboundDates(false);
         }
       }
     }
 
-    loadAvailableDates();
+    loadInboundDates();
     return () => {
       cancelled = true;
     };
-  }, [origen, destino, tripType]);
+  }, [tripType, origen, destino, dateIda]);
 
   useEffect(() => {
     if (!dateIda) return;
@@ -1840,7 +1895,7 @@ export default function HomePage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#E5EAEF] text-slate-900">
+    <main className="bg-[#E5EAEF] text-slate-900">
       <HomeMaritimeHeader
         topLinks={HOME_HEADER_TOP_LINKS}
         mainLinks={HOME_HEADER_LINKS}
@@ -1855,17 +1910,16 @@ export default function HomePage() {
           className="absolute inset-0 bg-cover bg-center bg-no-repeat"
           style={{ backgroundImage: `url('${HOME_HERO_BACKGROUND_IMAGE}')` }}
         />
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[#0a2348]/82 via-[#0a2348]/52 to-[#0a2348]/88" />
 
         <div className="relative z-[1] mx-auto max-w-7xl px-3 pb-24 pt-7 sm:px-5 sm:pb-28 sm:pt-9 lg:px-8 lg:pb-32 lg:pt-11">
-          <p className="text-center text-[11px] font-semibold uppercase tracking-[0.2em] text-white/90">
+          <p className="text-center text-[14px] font-semibold uppercase tracking-[0.2em] text-[#163B6D]">
             Traversées maritimes — Solair Voyages
           </p>
-          <h1 className="mx-auto mt-2 max-w-3xl text-center text-2xl font-bold leading-tight text-white sm:text-3xl lg:text-[2rem] lg:leading-snug">
-            Réservez votre traversée
+          <h1 className="mx-auto mt-2 max-w-3xl text-center text-2xl font-bold leading-tight text-[#ca0202] sm:text-3xl lg:text-[2rem] lg:leading-snug">
+            Réservez votre traversée au meilleur prix 
           </h1>
-          <p className="mx-auto mt-2 max-w-xl text-center text-sm text-white/85">
-            Ports, dates disponibles et réservation guidée.
+          <p className="mx-auto mt-2 max-w-xl text-center text-sm text-[#163B6D]">
+          Compagnie Armas Trasmediterranea
           </p>
 
           <div

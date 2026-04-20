@@ -237,6 +237,7 @@ function PaiementSuccesContent() {
           },
           body: JSON.stringify({
             orderID: token,
+            draftId,
           }),
         });
 

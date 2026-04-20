@@ -56,6 +56,47 @@ function statusClasses(status: "draft" | "reserved") {
     : "bg-[#fce9e6] text-[#c94c3d]";
 }
 
+function paymentLabel(status: string) {
+  switch (status) {
+    case "created":
+      return "Paiement créé";
+    case "captured":
+      return "Paiement capturé";
+    case "reservation_pending":
+      return "Finalisation dossier";
+    case "reserved":
+      return "Payé et réservé";
+    case "failed":
+      return "Paiement en échec";
+    case "denied":
+      return "Paiement refusé";
+    case "reversed":
+      return "Paiement annulé";
+    case "test_mode":
+      return "Mode test";
+    default:
+      return "Sans paiement";
+  }
+}
+
+function paymentClasses(status: string) {
+  switch (status) {
+    case "captured":
+    case "reserved":
+      return "bg-[#eef6eb] text-[#3f7f4a]";
+    case "reservation_pending":
+      return "bg-[#fff7e7] text-[#a27018]";
+    case "failed":
+    case "denied":
+    case "reversed":
+      return "bg-[#fce9e6] text-[#c94c3d]";
+    case "created":
+      return "bg-[#f4f1ff] text-[#6d4fd7]";
+    default:
+      return "bg-[#f8f3ec] text-[#6f5e50]";
+  }
+}
+
 function isStatusFilter(value: string): value is FilterStatus {
   return value === "all" || value === "reserved" || value === "draft";
 }
@@ -130,6 +171,9 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               </span>
               <span className="rounded-2xl bg-[#fbefe7] px-4 py-2 text-[#b86439]">
                 Brouillons {stats.totalDraftSales}
+              </span>
+              <span className="rounded-2xl bg-[#fff7e7] px-4 py-2 text-[#a27018]">
+                Paiement capturé sans dossier {stats.totalCapturedPendingReservation}
               </span>
               <span className="rounded-2xl bg-[#fff7e7] px-4 py-2 text-[#a27018]">
                 CA mois {formatMoney(stats.revenueMonth)}
@@ -207,13 +251,13 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
         </section>
 
         <section className="overflow-hidden rounded-[28px] border border-[#eadfd3] bg-white shadow-[0_18px_38px_rgb(80_61_43/0.08)]">
-          <div className="hidden grid-cols-[2.2fr_1.5fr_1.8fr_1.6fr_1fr_1.2fr_1.1fr_64px] items-center gap-4 border-b border-[#eee1d4] bg-[#f6f1ea] px-5 py-5 text-sm font-semibold text-[#8a7564] xl:grid">
+          <div className="hidden grid-cols-[2fr_1.4fr_1.6fr_1.4fr_1fr_1.5fr_1.1fr_64px] items-center gap-4 border-b border-[#eee1d4] bg-[#f6f1ea] px-5 py-5 text-sm font-semibold text-[#8a7564] xl:grid">
             <span>Référence</span>
             <span>Client</span>
             <span>Trajet</span>
             <span>Départ</span>
             <span>Total</span>
-            <span>Statut</span>
+            <span>Statuts</span>
             <span>Date</span>
             <span />
           </div>
@@ -227,7 +271,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               {filteredSales.map((sale) => (
                 <article
                   key={sale.id}
-                  className="xl:grid xl:grid-cols-[2.2fr_1.5fr_1.8fr_1.6fr_1fr_1.2fr_1.1fr_64px] xl:items-center xl:gap-4 xl:px-5 xl:py-5"
+                  className="xl:grid xl:grid-cols-[2fr_1.4fr_1.6fr_1.4fr_1fr_1.5fr_1.1fr_64px] xl:items-center xl:gap-4 xl:px-5 xl:py-5"
                 >
                   <div className="grid gap-4 px-5 py-5 xl:contents">
                     <div>
@@ -279,13 +323,22 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                     </div>
 
                     <div>
-                      <span
-                        className={`inline-flex rounded-full px-3 py-1.5 text-sm font-semibold ${statusClasses(
-                          sale.status
-                        )}`}
-                      >
-                        {statusLabel(sale.status)}
-                      </span>
+                      <div className="flex flex-wrap gap-2">
+                        <span
+                          className={`inline-flex rounded-full px-3 py-1.5 text-sm font-semibold ${statusClasses(
+                            sale.status
+                          )}`}
+                        >
+                          {statusLabel(sale.status)}
+                        </span>
+                        <span
+                          className={`inline-flex rounded-full px-3 py-1.5 text-sm font-semibold ${paymentClasses(
+                            sale.paymentStatus
+                          )}`}
+                        >
+                          {paymentLabel(sale.paymentStatus)}
+                        </span>
+                      </div>
                     </div>
 
                     <div>

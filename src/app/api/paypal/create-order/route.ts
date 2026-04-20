@@ -1,5 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getBookingDraft } from "@/lib/booking-draft-store";
+import {
+  getBookingDraft,
+  patchBookingDraftReservation,
+} from "@/lib/booking-draft-store";
+import {
+  getPayPalAccessToken,
+  getPayPalBaseUrl,
+} from "@/lib/paypal-server";
 
 export const dynamic = "force-dynamic";
 
@@ -8,12 +15,6 @@ type CreateOrderBody = {
   currency?: string;
   draftId: string;
   description?: string;
-};
-
-type PayPalTokenSuccess = {
-  access_token: string;
-  token_type: string;
-  expires_in: number;
 };
 
 type PayPalCreateOrderResponse = {
@@ -27,22 +28,8 @@ type PayPalCreateOrderResponse = {
   [key: string]: unknown;
 };
 
-function getPayPalBaseUrl() {
-  return process.env.PAYPAL_ENV === "live"
-    ? "https://api-m.paypal.com"
-    : "https://api-m.sandbox.paypal.com";
-}
-
 function getAppUrl() {
   return process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-}
-
-function getRequiredEnv() {
-  return {
-    clientId: process.env.PAYPAL_CLIENT_ID || "",
-    clientSecret: process.env.PAYPAL_CLIENT_SECRET || "",
-    env: process.env.PAYPAL_ENV || "sandbox",
-  };
 }
 
 function getApproveUrl(links?: Array<{ href?: string; rel?: string }>) {
@@ -52,59 +39,6 @@ function getApproveUrl(links?: Array<{ href?: string; rel?: string }>) {
     links.find((link) => link.rel === "approve")?.href ||
     ""
   );
-}
-
-async function getPayPalAccessToken() {
-  const { clientId, clientSecret, env } = getRequiredEnv();
-
-  if (!clientId || !clientSecret) {
-    throw new Error(
-      "Configuration PayPal incomplète. Vérifiez PAYPAL_CLIENT_ID et PAYPAL_CLIENT_SECRET."
-    );
-  }
-
-  const auth = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
-  const url = `${getPayPalBaseUrl()}/v1/oauth2/token`;
-
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      Authorization: `Basic ${auth}`,
-      "Content-Type": "application/x-www-form-urlencoded",
-      Accept: "application/json",
-      "Accept-Language": "fr_FR",
-    },
-    body: "grant_type=client_credentials",
-    cache: "no-store",
-  });
-
-  const rawText = await response.text();
-
-  let data: PayPalTokenSuccess | Record<string, unknown> = {};
-  try {
-    data = JSON.parse(rawText) as PayPalTokenSuccess | Record<string, unknown>;
-  } catch {
-    data = { rawText };
-  }
-
-  if (
-    !response.ok ||
-    !("access_token" in data) ||
-    typeof data.access_token !== "string"
-  ) {
-    const paypalError =
-      typeof (data as Record<string, unknown>)?.error_description === "string"
-        ? String((data as Record<string, unknown>).error_description)
-        : typeof (data as Record<string, unknown>)?.error === "string"
-        ? String((data as Record<string, unknown>).error)
-        : rawText || "Réponse inconnue PayPal.";
-
-    throw new Error(
-      `Impossible d’obtenir le token PayPal. HTTP ${response.status}. ENV=${env}. Détail: ${paypalError}`
-    );
-  }
-
-  return data.access_token;
 }
 
 export async function POST(request: NextRequest) {
@@ -250,6 +184,16 @@ export async function POST(request: NextRequest) {
         { status: 502 }
       );
     }
+
+    await patchBookingDraftReservation(draftId, {
+      paypalOrderId: data.id,
+      paypalOrderStatus: data.status || "CREATED",
+      paypalAmount: Number(authoritativeAmount).toFixed(2),
+      paypalCurrency: currency,
+      paymentStatus: "created",
+      paymentUpdatedAt: new Date().toISOString(),
+      paymentLastError: "",
+    });
 
     return NextResponse.json({
       ok: true,

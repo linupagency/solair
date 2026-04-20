@@ -99,6 +99,27 @@ export type BookingDraftReservation = {
   total: string;
   fechaValidezReserva?: string;
   businessCode?: string;
+  paypalOrderId?: string;
+  paypalOrderStatus?: string;
+  paypalCaptureId?: string;
+  paypalCaptureStatus?: string;
+  paypalAmount?: string;
+  paypalCurrency?: string;
+  paymentStatus?:
+    | "created"
+    | "captured"
+    | "reservation_pending"
+    | "reserved"
+    | "failed"
+    | "denied"
+    | "reversed"
+    | "test_mode";
+  paymentUpdatedAt?: string;
+  paymentCapturedAt?: string;
+  paymentLastError?: string;
+  emailStatus?: "pending" | "sent" | "failed";
+  emailSentAt?: string;
+  emailError?: string;
 };
 
 export type BookingDraft = {
@@ -173,14 +194,81 @@ export async function markBookingDraftReserved(
   draftId: string,
   reservation: BookingDraftReservation
 ) {
+  const existingDraft = await getBookingDraft(draftId);
+  const mergedReservation = {
+    ...(existingDraft?.reservation || {}),
+    ...reservation,
+  };
+
   const { data, error } = await getSupabaseAdmin()
     .from("booking_drafts")
     .update({
       status: "reserved",
-      reservation,
+      reservation: mergedReservation,
     })
     .eq("id", draftId)
     .select("id, status, payload, reservation, created_at, updated_at")
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  if (!data) {
+    return null;
+  }
+
+  return mapRowToDraft(data as BookingDraftRow);
+}
+
+export async function patchBookingDraftReservation(
+  draftId: string,
+  reservationPatch: Partial<BookingDraftReservation>
+) {
+  const existingDraft = await getBookingDraft(draftId);
+
+  if (!existingDraft) {
+    return null;
+  }
+
+  const nextReservation = {
+    ...(existingDraft.reservation || {}),
+    ...reservationPatch,
+  };
+
+  const { data, error } = await getSupabaseAdmin()
+    .from("booking_drafts")
+    .update({
+      reservation: nextReservation,
+    })
+    .eq("id", draftId)
+    .select("id, status, payload, reservation, created_at, updated_at")
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  if (!data) {
+    return null;
+  }
+
+  return mapRowToDraft(data as BookingDraftRow);
+}
+
+export async function findBookingDraftByPayPalOrderId(orderId: string) {
+  const normalizedOrderId = orderId.trim();
+
+  if (!normalizedOrderId) {
+    return null;
+  }
+
+  const { data, error } = await getSupabaseAdmin()
+    .from("booking_drafts")
+    .select("id, status, payload, reservation, created_at, updated_at")
+    .filter("reservation->>paypalOrderId", "eq", normalizedOrderId)
+    .order("updated_at", { ascending: false })
+    .limit(1)
     .maybeSingle();
 
   if (error) {

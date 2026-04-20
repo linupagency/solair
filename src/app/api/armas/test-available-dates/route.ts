@@ -49,6 +49,26 @@ function normalizeArmasDate(value?: string) {
   return digits.length >= 8 ? digits.slice(0, 8) : digits;
 }
 
+type AvailableDatesResponseBody = {
+  ok: true;
+  origen: string;
+  destino: string;
+  startDate: string;
+  days: number;
+  concurrency: number;
+  availableDates: string[];
+  warnings: string[];
+};
+
+type AvailableDatesCacheEntry = {
+  expiresAt: number;
+  data: AvailableDatesResponseBody;
+};
+
+const AVAILABLE_DATES_CACHE_TTL_MS = 5 * 60 * 1000;
+const availableDatesCache = new Map<string, AvailableDatesCacheEntry>();
+const availableDatesInFlight = new Map<string, Promise<AvailableDatesResponseBody>>();
+
 export async function GET(request: NextRequest) {
   const validation = validateArmasBasicConfig();
   if (!validation.isValid) {
@@ -74,6 +94,7 @@ export async function GET(request: NextRequest) {
   const concurrency = Number.isFinite(concurrencyRaw)
     ? Math.min(12, Math.max(1, Math.floor(concurrencyRaw)))
     : 8;
+  const cacheKey = [origen, destino, startDate, days, concurrency].join("|");
 
   if (!origen || !destino || !startDate) {
     return NextResponse.json(
@@ -96,44 +117,72 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const availableDatesSet = new Set<string>();
-  const warnings: string[] = [];
-  const dates = Array.from({ length: days }, (_, i) => addDays(startDate, i));
-  let cursor = 0;
-
-  async function worker() {
-    while (cursor < dates.length) {
-      const index = cursor;
-      cursor += 1;
-      const currentDate = dates[index];
-      try {
-        const result = await nasaSalidasRequest(origen, destino, currentDate);
-        const salidas = extractSalidas(result);
-        const hasStrictMatch = salidas.some(
-          (salida) => normalizeArmasDate(salida?.fechaSalida) === currentDate
-        );
-        if (hasStrictMatch) {
-          availableDatesSet.add(currentDate);
-        }
-      } catch (error) {
-        warnings.push(
-          `${currentDate}: ${error instanceof Error ? error.message : "Erreur inconnue"}`
-        );
-      }
-    }
+  const now = Date.now();
+  const cached = availableDatesCache.get(cacheKey);
+  if (cached && cached.expiresAt > now) {
+    return NextResponse.json(cached.data);
   }
 
-  await Promise.all(Array.from({ length: concurrency }, () => worker()));
-  const availableDates = Array.from(availableDatesSet).sort();
+  const inFlight = availableDatesInFlight.get(cacheKey);
+  if (inFlight) {
+    const data = await inFlight;
+    return NextResponse.json(data);
+  }
 
-  return NextResponse.json({
-    ok: true,
-    origen,
-    destino,
-    startDate,
-    days,
-    concurrency,
-    availableDates,
-    warnings,
-  });
+  const computePromise = (async () => {
+    const availableDatesSet = new Set<string>();
+    const warnings: string[] = [];
+    const dates = Array.from({ length: days }, (_, i) => addDays(startDate, i));
+    let cursor = 0;
+
+    async function worker() {
+      while (cursor < dates.length) {
+        const index = cursor;
+        cursor += 1;
+        const currentDate = dates[index];
+        try {
+          const result = await nasaSalidasRequest(origen, destino, currentDate);
+          const salidas = extractSalidas(result);
+          const hasStrictMatch = salidas.some(
+            (salida) => normalizeArmasDate(salida?.fechaSalida) === currentDate
+          );
+          if (hasStrictMatch) {
+            availableDatesSet.add(currentDate);
+          }
+        } catch (error) {
+          warnings.push(
+            `${currentDate}: ${error instanceof Error ? error.message : "Erreur inconnue"}`
+          );
+        }
+      }
+    }
+
+    await Promise.all(Array.from({ length: concurrency }, () => worker()));
+    const data: AvailableDatesResponseBody = {
+      ok: true,
+      origen,
+      destino,
+      startDate,
+      days,
+      concurrency,
+      availableDates: Array.from(availableDatesSet).sort(),
+      warnings,
+    };
+
+    availableDatesCache.set(cacheKey, {
+      expiresAt: Date.now() + AVAILABLE_DATES_CACHE_TTL_MS,
+      data,
+    });
+
+    return data;
+  })();
+
+  availableDatesInFlight.set(cacheKey, computePromise);
+
+  try {
+    const data = await computePromise;
+    return NextResponse.json(data);
+  } finally {
+    availableDatesInFlight.delete(cacheKey);
+  }
 }

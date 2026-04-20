@@ -44,7 +44,7 @@ export default async function AdminOverviewPage() {
         </p>
       </section>
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <article className="rounded-[24px] border border-[#eadfd3] bg-white px-5 py-5 shadow-[0_12px_24px_rgb(80_61_43/0.05)]">
           <p className="text-sm font-medium text-[#8d7764]">Réservations confirmées</p>
           <p className="mt-2 text-3xl font-semibold text-[#2f2826]">
@@ -61,6 +61,14 @@ export default async function AdminOverviewPage() {
           <p className="text-sm font-medium text-[#8d7764]">CA du mois</p>
           <p className="mt-2 text-3xl font-semibold text-[#9b7225]">
             {formatMoney(stats.revenueMonth)}
+          </p>
+        </article>
+        <article className="rounded-[24px] border border-[#eadfd3] bg-white px-5 py-5 shadow-[0_12px_24px_rgb(80_61_43/0.05)]">
+          <p className="text-sm font-medium text-[#8d7764]">
+            Paiements capturés à finaliser
+          </p>
+          <p className="mt-2 text-3xl font-semibold text-[#a27018]">
+            {stats.totalCapturedPendingReservation}
           </p>
         </article>
         <article className="rounded-[24px] border border-[#eadfd3] bg-white px-5 py-5 shadow-[0_12px_24px_rgb(80_61_43/0.05)]">
