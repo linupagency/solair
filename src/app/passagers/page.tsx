@@ -140,9 +140,9 @@ function passengerTypeLabelWithAge(code?: string) {
     case "A":
       return "Adulte (De 27 a 59 ans)";
     case "J":
-      return "Jeune (De 12 a 26 ans)";
+      return "Jeune (De 14 a 26 ans)";
     case "N":
-      return "Enfant (De 4 a 11 ans)";
+      return "Enfant (De 4 a 13 ans)";
     case "B":
       return "Bebe (De 0 a 3 ans)";
     default:

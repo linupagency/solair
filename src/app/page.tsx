@@ -2537,7 +2537,7 @@ export default function HomePage() {
 
           <CounterRow
             label="Jeune"
-            hint="De 12 à 26 ans"
+            hint="De 14 à 26 ans"
             value={passengers.youth}
             onChange={(next) =>
               setPassengers((prev) => ({ ...prev, youth: next }))
@@ -2555,7 +2555,7 @@ export default function HomePage() {
 
           <CounterRow
             label="Enfants"
-            hint="De 4 à 11 ans"
+            hint="De 4 à 13 ans"
             value={passengers.children}
             onChange={(next) =>
               setPassengers((prev) => ({ ...prev, children: next }))
